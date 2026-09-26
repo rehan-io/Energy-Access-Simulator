@@ -167,11 +167,11 @@ energy-access-simulator/
 
 ---
 
-## 🤝 Contributing
+<!-- ## 🤝 Contributing
 
 *Currently, this project is in the planning phase. Contribution guidelines will be published once the initial codebase is scaffolded. Please check back later for development milestones.*
 
----
+--- -->
 
 ## 📄 License
 
