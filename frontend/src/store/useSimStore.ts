@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { Levers, YearSnapshot } from '../types';
 import { simulate } from '../utils/simulation';
+import { fetchSimulation } from '../services/api';
 
 export interface Scenario {
   id: string;
@@ -17,7 +18,7 @@ interface SimState {
   scenarios: Scenario[];
   setLever: (k: keyof Levers, v: number) => void;
   setYear: (y: number) => void;
-  runSim: () => void;
+  runSim: () => Promise<void>;
   saveScenario: (name: string) => void;
   loadScenario: (id: string) => void;
   deleteScenario: (id: string) => void;
@@ -33,10 +34,17 @@ export const useSimStore = create<SimState>((set, get) => ({
   scenarios: [],
   setLever: (k, v) => set((s) => ({ levers: { ...s.levers, [k]: v } })),
   setYear: (year) => set({ year }),
-  runSim: () => {
+  runSim: async () => {
     const { levers } = get();
     set({ running: true });
-    setTimeout(() => set({ history: simulate(levers), running: false }), 350);
+    try {
+      const history = await fetchSimulation(levers);
+      set({ history, running: false });
+    } catch (err) {
+      console.error('Failed to run backend simulation:', err);
+      // Fallback to local simulation if backend is down
+      set({ history: simulate(levers), running: false });
+    }
   },
   saveScenario: (name) => {
     const { levers, history } = get();

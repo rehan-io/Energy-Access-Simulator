@@ -134,3 +134,28 @@ def get_worldbank_data(request: WorldBankRequest):
         "rows": rows,
         "failures": failures,
     }
+
+from app.core.simulation import run_simulation
+
+class LeversModel(BaseModel):
+    subsidy: float = Field(ge=0, le=100)
+    carbonTax: float = Field(ge=0, le=100)
+    offGrid: float = Field(ge=0, le=100)
+    gridExt: float = Field(ge=0, le=100)
+
+class SimulationRequest(BaseModel):
+    levers: LeversModel
+    startYear: int = Field(default=2026)
+    years: int = Field(default=25)
+
+@app.post("/api/simulate")
+def simulate_endpoint(payload: SimulationRequest):
+    history = run_simulation(
+        subsidy=payload.levers.subsidy,
+        carbon_tax=payload.levers.carbonTax,
+        off_grid=payload.levers.offGrid,
+        grid_ext=payload.levers.gridExt,
+        start_year=payload.startYear,
+        years=payload.years,
+    )
+    return {"history": history}
