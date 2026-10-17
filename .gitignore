@@ -13,3 +13,5 @@ __pycache__/
 
 # Generated World Bank CSVs
 **/data/raw/worldbank/*.csv
+
+frontend/node_modules
