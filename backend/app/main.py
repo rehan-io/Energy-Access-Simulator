@@ -135,7 +135,18 @@ def get_worldbank_data(request: WorldBankRequest):
         "failures": failures,
     }
 
-from app.core.simulation import run_simulation
+from app.core.simulation import COUNTRY_PRESETS, get_country_preset, run_simulation
+
+AVAILABLE_COUNTRIES = [
+    {"code": "IND", "name": "India", "flag": "🇮🇳", "access": 99.6},
+    {"code": "KEN", "name": "Kenya", "flag": "🇰🇪", "access": 77.0},
+    {"code": "RWA", "name": "Rwanda", "flag": "🇷🇼", "access": 72.4},
+    {"code": "NGA", "name": "Nigeria", "flag": "🇳🇬", "access": 59.5},
+]
+
+@app.get("/api/countries")
+def get_countries():
+    return AVAILABLE_COUNTRIES
 
 class LeversModel(BaseModel):
     subsidy: float = Field(ge=0, le=100)
@@ -145,17 +156,27 @@ class LeversModel(BaseModel):
 
 class SimulationRequest(BaseModel):
     levers: LeversModel
+    country: str = Field(default="IND", min_length=3, max_length=3)
     startYear: int = Field(default=2026)
     years: int = Field(default=25)
 
 @app.post("/api/simulate")
 def simulate_endpoint(payload: SimulationRequest):
+    country_code = payload.country.upper()
+    initial_stocks = get_country_preset(country_code)
+
     history = run_simulation(
         subsidy=payload.levers.subsidy,
         carbon_tax=payload.levers.carbonTax,
         off_grid=payload.levers.offGrid,
         grid_ext=payload.levers.gridExt,
+        country=country_code,
+        initial_stocks=initial_stocks,
         start_year=payload.startYear,
         years=payload.years,
     )
-    return {"history": history}
+    return {
+        "country": country_code,
+        "initialStocks": initial_stocks,
+        "history": history,
+    }

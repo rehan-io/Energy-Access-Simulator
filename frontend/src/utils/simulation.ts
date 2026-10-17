@@ -1,11 +1,19 @@
-import type { Levers, YearSnapshot } from '../types';
+import type { Levers, YearSnapshot, TierKey } from '../types';
+
+export const DUMMY_COUNTRY_STOCKS: Record<string, Record<TierKey, number>> = {
+  IND: { traditional: 1.0,  lantern: 2.0,  shs: 5.0,  minigrid: 2.0, grid: 90.0 },
+  KEN: { traditional: 18.0, lantern: 10.0, shs: 22.0, minigrid: 4.0, grid: 46.0 },
+  RWA: { traditional: 24.0, lantern: 12.0, shs: 18.0, minigrid: 4.0, grid: 42.0 },
+  NGA: { traditional: 35.0, lantern: 15.0, shs: 12.0, minigrid: 3.0, grid: 35.0 },
+};
 
 export function simulate(
   levers: Levers,
+  country = 'IND',
   startYear = 2026,
   years = 25,
 ): YearSnapshot[] {
-  let s = { traditional: 60, lantern: 20, shs: 12, minigrid: 4, grid: 4 };
+  const s = { ...(DUMMY_COUNTRY_STOCKS[country] || DUMMY_COUNTRY_STOCKS.IND) };
 
   const baseRate = 0.02;
   const subsidyBoost  = levers.subsidy   * 0.0006;
