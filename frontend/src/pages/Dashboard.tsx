@@ -1,9 +1,11 @@
-import { useMemo, useState } from 'react';
+// frontend/src/pages/Dashboard.tsx
+import { useEffect, useMemo, useState } from 'react';
 import {
-  AppBar, Toolbar, Typography, Box, Paper, Stack, Button, Chip,
+  AppBar, Toolbar, Typography, Box, Paper, Stack, Button, Chip, Select, MenuItem,
 } from '@mui/material';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import SaveIcon from '@mui/icons-material/Save';
+import PublicIcon from '@mui/icons-material/Public';
 import { useSimStore } from '../store/useSimStore';
 import { LeverSlider } from '../components/LeverSlider';
 import { KpiCards } from '../components/KpiCards';
@@ -13,13 +15,19 @@ import { INDIA_STATES } from '../data/indiaStates';
 
 export function Dashboard() {
   const {
+    country, setCountry, countries, initialStocks, initCountries,
     levers, setLever, year, setYear,
     history, runSim, running,
     scenarios, saveScenario, loadScenario, deleteScenario,
   } = useSimStore();
 
   const [scenarioName, setScenarioName] = useState('');
-  const current = history[Math.min(year - 2026, history.length - 1)];
+
+  useEffect(() => {
+    initCountries();
+  }, [initCountries]);
+
+  const current = history[Math.min(year - 2026, history.length - 1)] || history[0];
 
   const accessByState = useMemo(() => {
     const nationalAccess = current.shs + current.minigrid + current.grid;
@@ -34,63 +42,170 @@ export function Dashboard() {
 
   return (
     <Box sx={{ minHeight: '100vh' }}>
-      <AppBar position="sticky" elevation={0}
-        sx={{ bgcolor: 'background.paper', borderBottom: '1px solid #1E2740' }}>
+      <AppBar
+        position="sticky"
+        elevation={0}
+        sx={{ bgcolor: 'background.paper', borderBottom: '1px solid #1E2740' }}
+      >
         <Toolbar>
           <Typography variant="h6">⚡ Energy Access Dynamics Simulator</Typography>
           <Box sx={{ flex: 1 }} />
-          <Chip label="India · 2026–2050" size="small"
-            sx={{ bgcolor: '#1E2740', color: '#94A3B8' }} />
+
+          {/* ── Country Selector ── */}
+          <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+            <PublicIcon sx={{ color: 'primary.main', fontSize: 20 }} />
+            <Select
+              size="small"
+              value={country}
+              onChange={(e) => setCountry(e.target.value)}
+              sx={{
+                bgcolor: '#0B1220',
+                color: '#E8EAF2',
+                height: 34,
+                fontSize: '0.85rem',
+                border: '1px solid #1E2740',
+                '& .MuiSvgIcon-root': { color: '#94A3B8' },
+              }}
+            >
+              {countries.map((c) => (
+                <MenuItem key={c.code} value={c.code}>
+                  {c.flag} {c.name} ({c.code})
+                </MenuItem>
+              ))}
+            </Select>
+            <Chip
+              label="2026–2050"
+              size="small"
+              sx={{ bgcolor: '#1E2740', color: '#94A3B8' }}
+            />
+          </Stack>
         </Toolbar>
       </AppBar>
 
       <Box sx={{ display: 'flex', p: 3, gap: 3, alignItems: 'flex-start' }}>
         {/* ── Controls ── */}
         <Paper sx={{ width: 320, p: 3, flexShrink: 0, border: '1px solid #1E2740' }}>
+          {/* Year 0 Country Baseline Preview */}
+          <Typography variant="overline" color="text.secondary">
+            Year 0 Baseline ({country})
+          </Typography>
+          <Paper
+            sx={{
+              p: 1.5,
+              mt: 1,
+              mb: 3,
+              bgcolor: '#0B1220',
+              border: '1px solid #1E2740',
+              borderRadius: 2,
+            }}
+          >
+            <Stack spacing={0.5}>
+              <Typography variant="caption" sx={{ color: '#42A5F5' }}>
+                Grid: <b>{initialStocks.grid}%</b> · SHS: <b>{initialStocks.shs}%</b>
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#8D6E63' }}>
+                Traditional: <b>{initialStocks.traditional}%</b> · Lantern: <b>{initialStocks.lantern}%</b>
+              </Typography>
+            </Stack>
+          </Paper>
+
           <Typography variant="overline" color="text.secondary">Policy Levers</Typography>
           <Stack spacing={3} sx={{ mt: 2 }}>
-            <LeverSlider label="Subsidy"             value={levers.subsidy}   color="#FFB74D"
-              onChange={(v) => setLever('subsidy', v)}   description="Reduces upfront SHS cost" />
-            <LeverSlider label="Carbon Tax"          value={levers.carbonTax} color="#EF5350"
-              onChange={(v) => setLever('carbonTax', v)} description="Raises kerosene / diesel price" />
-            <LeverSlider label="Off-Grid Deployment" value={levers.offGrid}   color="#26A69A"
-              onChange={(v) => setLever('offGrid', v)}   description="Solar companies reach" />
-            <LeverSlider label="Grid Extension"      value={levers.gridExt}   color="#42A5F5"
-              onChange={(v) => setLever('gridExt', v)}   description="National grid build rate" />
+            <LeverSlider
+              label="Subsidy"
+              value={levers.subsidy}
+              color="#FFB74D"
+              onChange={(v) => setLever('subsidy', v)}
+              description="Reduces upfront SHS cost"
+            />
+            <LeverSlider
+              label="Carbon Tax"
+              value={levers.carbonTax}
+              color="#EF5350"
+              onChange={(v) => setLever('carbonTax', v)}
+              description="Raises kerosene / diesel price"
+            />
+            <LeverSlider
+              label="Off-Grid Deployment"
+              value={levers.offGrid}
+              color="#26A69A"
+              onChange={(v) => setLever('offGrid', v)}
+              description="Solar companies reach"
+            />
+            <LeverSlider
+              label="Grid Extension"
+              value={levers.gridExt}
+              color="#42A5F5"
+              onChange={(v) => setLever('gridExt', v)}
+              description="National grid build rate"
+            />
           </Stack>
 
           <Button
-            fullWidth variant="contained" startIcon={<PlayArrowIcon />}
-            onClick={runSim} disabled={running}
-            sx={{ mt: 3, fontWeight: 700, color: '#0B1220',
-                  '&:hover': { bgcolor: '#FFC978' } }}
+            fullWidth
+            variant="contained"
+            startIcon={<PlayArrowIcon />}
+            onClick={runSim}
+            disabled={running}
+            sx={{
+              mt: 3,
+              fontWeight: 700,
+              color: '#0B1220',
+              '&:hover': { bgcolor: '#FFC978' },
+            }}
           >
             {running ? 'Simulating…' : 'Run Simulation'}
           </Button>
 
-          <Typography variant="overline" color="text.secondary"
-            sx={{ display: 'block', mt: 4 }}>Scenarios</Typography>
+          <Typography variant="overline" color="text.secondary" sx={{ display: 'block', mt: 4 }}>
+            Scenarios
+          </Typography>
           <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
             <input
               placeholder="Name"
               value={scenarioName}
               onChange={(e) => setScenarioName(e.target.value)}
               style={{
-                flex: 1, background: '#0B1220', border: '1px solid #1E2740',
-                color: '#E8EAF2', padding: '8px 10px', borderRadius: 8, outline: 'none',
+                flex: 1,
+                background: '#0B1220',
+                border: '1px solid #1E2740',
+                color: '#E8EAF2',
+                padding: '8px 10px',
+                borderRadius: 8,
+                outline: 'none',
               }}
             />
-            <Button variant="outlined" startIcon={<SaveIcon />}
-              onClick={() => { if (scenarioName) { saveScenario(scenarioName); setScenarioName(''); } }}
+            <Button
+              variant="outlined"
+              startIcon={<SaveIcon />}
+              onClick={() => {
+                if (scenarioName) {
+                  saveScenario(scenarioName);
+                  setScenarioName('');
+                }
+              }}
               sx={{ color: 'secondary.main', borderColor: 'secondary.main' }}
-            >Save</Button>
+            >
+              Save
+            </Button>
           </Stack>
+
           <Stack spacing={1} sx={{ mt: 2 }}>
             {scenarios.map((s) => (
-              <Paper key={s.id}
-                sx={{ p: 1.5, bgcolor: '#0B1220', border: '1px solid #1E2740',
-                      display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Typography variant="body2" sx={{ flex: 1 }}>{s.name}</Typography>
+              <Paper
+                key={s.id}
+                sx={{
+                  p: 1.5,
+                  bgcolor: '#0B1220',
+                  border: '1px solid #1E2740',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1,
+                }}
+              >
+                <Typography variant="body2" sx={{ flex: 1 }}>
+                  {s.name} ({s.country})
+                </Typography>
                 <Button size="small" onClick={() => loadScenario(s.id)}>Load</Button>
                 <Button size="small" color="error" onClick={() => deleteScenario(s.id)}>×</Button>
               </Paper>
@@ -112,22 +227,51 @@ export function Dashboard() {
           </Paper>
 
           <Paper sx={{ p: 2, border: '1px solid #1E2740' }}>
-            <Stack direction="row" spacing={2} alignItems="center">
+            <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
               <Typography variant="overline" color="text.secondary">Year</Typography>
               <input
-                type="range" min={2026} max={2050} value={year}
+                type="range"
+                min={2026}
+                max={2050}
+                value={year}
                 onChange={(e) => setYear(+e.target.value)}
                 style={{ flex: 1, accentColor: '#FFB74D' }}
               />
-              <Typography variant="h6"
-                sx={{ fontWeight: 700, color: 'primary.main', minWidth: 60, textAlign: 'right' }}>
+              <Typography
+                variant="h6"
+                sx={{ fontWeight: 700, color: 'primary.main', minWidth: 60, textAlign: 'right' }}
+              >
                 {year}
               </Typography>
             </Stack>
+
           </Paper>
 
           <Paper sx={{ height: 520, overflow: 'hidden', border: '1px solid #1E2740' }}>
-            <IndiaMap states={INDIA_STATES} year={year} accessByState={accessByState} />
+            {country === 'IND' ? (
+              <IndiaMap states={INDIA_STATES} year={year} accessByState={accessByState} />
+            ) : (
+              <Box
+                sx={{
+                  height: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  p: 4,
+                  textAlign: 'center',
+                }}
+              >
+                <Box>
+                  <Typography variant="h6" color="text.secondary">
+                    Subnational Geo Data for {country}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1, maxWidth: 450 }}>
+                    State-level granularity is currently mapped for India (IND). National energy ladder
+                    dynamics above are actively simulating for {country}.
+                  </Typography>
+                </Box>
+              </Box>
+            )}
           </Paper>
         </Stack>
       </Box>

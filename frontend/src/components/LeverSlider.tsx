@@ -11,7 +11,11 @@ interface Props {
 export function LeverSlider({ label, value, onChange, color = '#FFB74D', description }: Props) {
   return (
     <Box>
-      <Stack direction="row" justifyContent="space-between" alignItems="baseline">
+      {/* Move justifyContent and alignItems into sx */}
+      <Stack
+        direction="row"
+        sx={{ justifyContent: 'space-between', alignItems: 'baseline' }}
+      >
         <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>{label}</Typography>
         <Typography variant="subtitle1" sx={{ color, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
           {value}%

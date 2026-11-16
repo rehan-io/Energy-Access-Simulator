@@ -1,5 +1,12 @@
 export type TierKey = 'traditional' | 'lantern' | 'shs' | 'minigrid' | 'grid';
 
+export interface CountryOption {
+  code: string;
+  name: string;
+  flag: string;
+  access: number;
+}
+
 export interface Levers {
   subsidy: number;    // 0–100
   carbonTax: number;  // 0–100
