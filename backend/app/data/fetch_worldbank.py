@@ -156,8 +156,12 @@ def main():
 
     print(f"\nSaved to {outdir.resolve()}")
     if failed:
-        print(f"Indicators that failed (retry later or check the code): {failed}")
+        print(f"Indicators that failed (retry later or check the code): {failed}",
+                file=sys.stderr,
+              )
+        return 1
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
