@@ -25,8 +25,9 @@ export function IndiaMap({ states, year, accessByState }: Props) {
       style={{ height: '100%', width: '100%', background: '#0B1220' }}
     >
       <TileLayer
-        url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-        attribution='&copy; OpenStreetMap &copy; CARTO'
+        url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}"
+        attribution="Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ"
+        maxZoom={16}
       />
       {states.map((s) => {
         const access = accessByState[s.id] ?? s.initialAccess;
