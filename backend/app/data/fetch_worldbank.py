@@ -1,11 +1,4 @@
 """
-fetch_worldbank.py
-------------------
-Download World Bank indicators (electricity access, population, GDP, ...) for
-one or more countries and save them as tidy CSV files.
-
-No API key is needed. Docs: https://datahelpdesk.worldbank.org/knowledgebase/articles/889392
-
 Examples
 --------
     # Kenya + Rwanda, all default indicators, 2000-2024
@@ -157,7 +150,10 @@ def main():
     print(f"\nSaved to {outdir.resolve()}")
     if failed:
         print(f"Indicators that failed (retry later or check the code): {failed}")
+        return 1
+
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
