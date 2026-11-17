@@ -1,16 +1,17 @@
 
 """
-Execute a safe World Bank dataset refresh.
+World Bank dataset refresh.
 
-    1. Fetch raw observations into a temporary directory.
-    2. Clean and transform the raw observations.
-    3. Validate the cleaned long-format dataset.
-    4. Promote the processed files only if validation succeeds.
+Examples:
+Full initial fetch:
+    python -m app.data.refresh_worldbank \
+        --countries IND KEN RWA NGA \
+        --mode full --start 2000 --end 2026
 
-Run from the backend directory:
-
-    python -m app.data.refresh_worldbank --countries IND KEN RWA NGA  etc
-
+Incremental refresh:
+    python -m app.data.refresh_worldbank \
+        --countries IND KEN RWA NGA \
+        --mode incremental --overlap-years 3
 """
 
 import argparse
@@ -18,29 +19,108 @@ import shutil
 import subprocess
 import sys
 import tempfile
-
 from pathlib import Path
 
 import pandas as pd
 
-from app.data.clean_worldbank import clean_worldbank_data
+from app.data.clean_worldbank import (
+    clean_worldbank_data,
+    normalise_data,
+    remove_duplicates,
+)
 from app.data.validate_worldbank import (
     validate_worldbank_data,
     write_report,
 )
 from app.data.dataset_loader import get_data_directory
+from app.data.schemas import LONG_COLUMNS, KEY_COLUMNS
+
+
+def determine_incremental_start(
+    existing: pd.DataFrame,
+    countries: list[str],
+    overlap_years: int,
+    fallback_start: int,
+) -> int:
+    """Find the earliest year that needs refreshing."""
+
+    country_data = existing.loc[
+        existing["iso3"].isin(countries)
+    ]
+
+    if country_data.empty:
+        return fallback_start
+
+    latest_by_country = (
+        country_data.groupby("iso3")["year"].max()
+    )
+
+    # If any requested country is absent, use the full fallback range.
+    if not set(countries).issubset(set(latest_by_country.index)):
+        return fallback_start
+
+    earliest_latest_year = int(latest_by_country.min())
+
+    return max(
+        fallback_start,
+        earliest_latest_year - overlap_years,
+    )
+
+
+def merge_datasets(
+    existing: pd.DataFrame,
+    incoming: pd.DataFrame,
+) -> tuple[pd.DataFrame, dict]:
+    """
+    Merge new observations with existing observations.
+
+    Newer retrievals replace observations with matching
+    country-year-indicator keys. Unaffected observations remain.
+    """
+
+    existing = normalise_data(existing.loc[:, LONG_COLUMNS])
+    incoming = normalise_data(incoming.loc[:, LONG_COLUMNS])
+
+    existing = remove_duplicates(existing)
+    incoming = remove_duplicates(incoming)
+
+    existing_keys = set(
+        map(tuple, existing.loc[:, KEY_COLUMNS].to_numpy())
+    )
+
+    incoming_keys = set(
+        map(tuple, incoming.loc[:, KEY_COLUMNS].to_numpy())
+    )
+
+    added = len(incoming_keys - existing_keys)
+    overlapping = len(incoming_keys & existing_keys)
+
+    combined = pd.concat(
+        [existing, incoming],
+        ignore_index=True,
+    )
+
+    merged = remove_duplicates(combined)
+
+    retained = len(existing_keys - incoming_keys)
+
+    statistics = {
+        "existing_observations": len(existing),
+        "incoming_observations": len(incoming),
+        "added_observations": added,
+        "overlapping_observations": overlapping,
+        "retained_observations": retained,
+        "merged_observations": len(merged),
+    }
+
+    return merged, statistics
 
 
 def promote_datasets(
     staging_dir: Path,
     active_dir: Path,
 ) -> None:
-    """
-    Replace active datasets with validated staged datasets.
-
-    Existing files are backed up first. If promotion fails,
-    the previous files are restored.
-    """
+    """Promote validated files, restoring previous files on failure."""
 
     filenames = [
         "worldbank_long.csv",
@@ -58,45 +138,34 @@ def promote_datasets(
     promoted = []
 
     try:
-        # Back up existing files.
         for filename in filenames:
-            active_file = active_dir / filename
+            destination = active_dir / filename
 
-            if active_file.exists():
+            if destination.exists():
                 shutil.copy2(
-                    active_file,
+                    destination,
                     backup_dir / filename,
                 )
                 backed_up.append(filename)
 
-        # Promote the validated files.
         for filename in filenames:
             source = staging_dir / filename
 
             if not source.is_file():
                 raise FileNotFoundError(
-                    f"Staged output is missing: {filename}"
+                    f"Staged output missing: {filename}"
                 )
 
-            destination = active_dir / filename
-
-            destination.parent.mkdir(
-                parents=True,
-                exist_ok=True,
-            )
-
-            source.replace(destination)
+            source.replace(active_dir / filename)
             promoted.append(filename)
 
     except Exception:
-        # Remove files that were already promoted.
         for filename in promoted:
             destination = active_dir / filename
 
             if destination.exists():
                 destination.unlink()
 
-        # Restore the previous versions.
         for filename in backed_up:
             shutil.copy2(
                 backup_dir / filename,
@@ -106,10 +175,7 @@ def promote_datasets(
         raise
 
     finally:
-        shutil.rmtree(
-            backup_dir,
-            ignore_errors=True,
-        )
+        shutil.rmtree(backup_dir, ignore_errors=True)
 
 
 def refresh_worldbank_data(
@@ -117,46 +183,67 @@ def refresh_worldbank_data(
     start: int,
     end: int,
     active_dir: Path,
+    mode: str = "incremental",
+    overlap_years: int = 3,
 ) -> None:
-    """Execute the complete staged refresh workflow."""
+    """Run full or incremental refresh with validation before promotion."""
 
     if start > end:
         raise ValueError("Start year cannot exceed end year.")
 
-    countries = [
+    if overlap_years < 0:
+        raise ValueError("Overlap years cannot be negative.")
+
+    countries = list(dict.fromkeys(
         country.strip().upper()
         for country in countries
-    ]
+    ))
 
     if not countries or any(
         len(country) != 3 or not country.isalpha()
         for country in countries
     ):
-        raise ValueError(
-            "Provide valid three-letter ISO3 country codes."
-        )
+        raise ValueError("Provide valid three-letter ISO3 country codes.")
 
-    countries = list(dict.fromkeys(countries))
+    if mode not in {"full", "incremental"}:
+        raise ValueError("Mode must be 'full' or 'incremental'.")
 
-    fetch_script = Path(__file__).with_name(
-        "fetch_worldbank.py"
-    )
+    fetch_script = Path(__file__).with_name("fetch_worldbank.py")
 
     if not fetch_script.is_file():
-        raise FileNotFoundError(
-            f"World Bank fetcher not found: {fetch_script}"
+        raise FileNotFoundError(fetch_script)
+
+    existing_file = active_dir / "worldbank_long.csv"
+    existing = None
+
+    if existing_file.is_file():
+        existing = pd.read_csv(existing_file)
+
+        missing = [
+            column for column in LONG_COLUMNS
+            if column not in existing.columns
+        ]
+
+        if missing:
+            raise ValueError(
+                f"Existing dataset is missing columns: {missing}"
+            )
+
+    if mode == "incremental" and existing is not None:
+        fetch_start = determine_incremental_start(
+            existing=existing,
+            countries=countries,
+            overlap_years=overlap_years,
+            fallback_start=start,
         )
+    else:
+        fetch_start = start
 
-    print("Starting World Bank dataset refresh...")
+    print(f"Refresh mode: {mode}")
     print(f"Countries: {', '.join(countries)}")
-    print(f"Years: {start}-{end}")
-    print(f"Active dataset directory: {active_dir}")
+    print(f"Fetching years: {fetch_start}-{end}")
 
-    # Temporary workspace is created beside the active dataset directory.
-    active_dir.parent.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
+    active_dir.parent.mkdir(parents=True, exist_ok=True)
 
     with tempfile.TemporaryDirectory(
         prefix="worldbank_refresh_",
@@ -164,7 +251,6 @@ def refresh_worldbank_data(
     ) as temporary_directory:
 
         workspace = Path(temporary_directory)
-
         raw_dir = workspace / "raw"
         staging_dir = workspace / "processed"
 
@@ -172,15 +258,13 @@ def refresh_worldbank_data(
         staging_dir.mkdir()
 
         # 1. Fetch
-        print("\n[1/4] Fetching World Bank observations...")
-
         command = [
             sys.executable,
             str(fetch_script),
             "--countries",
             *countries,
             "--start",
-            str(start),
+            str(fetch_start),
             "--end",
             str(end),
             "--outdir",
@@ -200,28 +284,63 @@ def refresh_worldbank_data(
                 "Fetcher did not produce worldbank_long.csv."
             )
 
-        # 2. Clean
-        print("\n[2/4] Cleaning and transforming observations...")
+        incoming = pd.read_csv(raw_file)
 
-        clean_worldbank_data(
-            input_path=raw_file,
-            output_dir=staging_dir,
+        # 2. Merge with existing data, or use incoming data for first setup.
+        if existing is not None:
+            merged, statistics = merge_datasets(
+                existing,
+                incoming,
+            )
+        else:
+            merged = normalise_data(incoming)
+            merged = remove_duplicates(merged)
+
+            statistics = {
+                "existing_observations": 0,
+                "incoming_observations": len(incoming),
+                "added_observations": len(merged),
+                "overlapping_observations": 0,
+                "retained_observations": 0,
+                "merged_observations": len(merged),
+            }
+
+        print("\nRefresh statistics:")
+
+        for name, value in statistics.items():
+            print(f"  {name}: {value}")
+
+        # 3. Generate all processed datasets from the merged long data.
+        from app.data.clean_worldbank import (
+            create_wide_dataset,
+            create_latest_dataset,
         )
 
-        # 3. Validate
-        print("\n[3/4] Validating processed observations...")
+        wide = create_wide_dataset(merged)
+        latest = create_latest_dataset(merged)
 
-        cleaned_file = staging_dir / "worldbank_long.csv"
+        merged.to_csv(
+            staging_dir / "worldbank_long.csv",
+            index=False,
+        )
+        wide.to_csv(
+            staging_dir / "worldbank_wide.csv",
+            index=False,
+        )
+        latest.to_csv(
+            staging_dir / "worldbank_latest.csv",
+            index=False,
+        )
 
-        cleaned_df = pd.read_csv(cleaned_file)
+        # 4. Validate the complete merged dataset.
+        result = validate_worldbank_data(merged)
 
-        result = validate_worldbank_data(cleaned_df)
+        write_report(
+            result,
+            staging_dir / "worldbank_quality_report.txt",
+        )
 
-        report_file = staging_dir / "worldbank_quality_report.txt"
-
-        write_report(result, report_file)
-
-        print(f"Validation errors: {len(result.errors)}")
+        print(f"\nValidation errors: {len(result.errors)}")
         print(f"Validation warnings: {len(result.warnings)}")
 
         if not result.is_valid:
@@ -229,52 +348,54 @@ def refresh_worldbank_data(
                 print(f"ERROR: {error}")
 
             raise RuntimeError(
-                "Dataset validation failed. "
-                "The existing active dataset has not been changed."
+                "Merged dataset failed validation. "
+                "Active datasets have not been changed."
             )
 
-        # 4. Promote
-        print("\n[4/4] Promoting validated datasets...")
-
+        # 5. Promote only after successful validation.
         promote_datasets(
             staging_dir=staging_dir,
             active_dir=active_dir,
         )
 
-    print("\nWorld Bank dataset refresh completed successfully.")
+    print("\nWorld Bank refresh completed successfully.")
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Safely refresh processed World Bank datasets."
+        description="Refresh World Bank datasets."
     )
 
     parser.add_argument(
         "--countries",
         nargs="+",
         required=True,
-        help="ISO3 country codes, e.g. IND KEN RWA NGA.",
     )
-
+    parser.add_argument(
+        "--mode",
+        choices=["full", "incremental"],
+        default="incremental",
+    )
     parser.add_argument(
         "--start",
         type=int,
         default=2000,
-        help="Starting observation year.",
+        help="Earliest year for full refresh or first-time setup.",
     )
-
     parser.add_argument(
         "--end",
         type=int,
-        default=2025,
-        help="Ending observation year.",
+        default=pd.Timestamp.today().year,
     )
-
+    parser.add_argument(
+        "--overlap-years",
+        type=int,
+        default=3,
+    )
     parser.add_argument(
         "--data-dir",
         type=Path,
         default=None,
-        help="Destination for active processed datasets.",
     )
 
     args = parser.parse_args()
@@ -290,6 +411,8 @@ def main() -> None:
         start=args.start,
         end=args.end,
         active_dir=active_dir,
+        mode=args.mode,
+        overlap_years=args.overlap_years,
     )
 
 
