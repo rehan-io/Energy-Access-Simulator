@@ -1,91 +1,83 @@
 import { create } from 'zustand';
-import type { Levers, YearSnapshot, CountryOption, TierKey } from '../types';
-import { simulate, DUMMY_COUNTRY_STOCKS } from '../utils/simulation';
-import { fetchSimulation, fetchCountries } from '../services/api';
+import type { Levers, YearSnapshot } from '../types';
+import { simulate as simulateLocal } from '../utils/simulation';
+import { simulateRemote } from '../api/client';
 
 export interface Scenario {
   id: string;
   name: string;
-  country: string;
+  country: string;               // ← NEW
   levers: Levers;
   history: YearSnapshot[];
 }
 
+type Source = 'backend' | 'local' | null;
+
 interface SimState {
-  country: string;
-  countries: CountryOption[];
-  initialStocks: Record<TierKey, number>;
+  country: string;                          // ← NEW
+  initialStocks: Record<string, number>;    // ← NEW
   levers: Levers;
   year: number;
   running: boolean;
   history: YearSnapshot[];
+  source: Source;
+  lastError: string | null;
   scenarios: Scenario[];
-  setCountry: (country: string) => void;
+  setCountry: (c: string) => void;          // ← NEW
   setLever: (k: keyof Levers, v: number) => void;
   setYear: (y: number) => void;
   runSim: () => Promise<void>;
-  initCountries: () => Promise<void>;
   saveScenario: (name: string) => void;
   loadScenario: (id: string) => void;
   deleteScenario: (id: string) => void;
 }
 
-const DEFAULT_LEVERS: Levers = { subsidy: 20, carbonTax: 10, offGrid: 30, gridExt: 30 };
+const DEFAULT_LEVERS: Levers = {
+  subsidy: 20, carbonTax: 10, offGrid: 30, gridExt: 30,
+};
 
-const DEFAULT_COUNTRIES: CountryOption[] = [
-  { code: 'IND', name: 'India', flag: '🇮🇳', access: 99.6 },
-  { code: 'KEN', name: 'Kenya', flag: '🇰🇪', access: 77.0 },
-  { code: 'RWA', name: 'Rwanda', flag: '🇷🇼', access: 72.4 },
-  { code: 'NGA', name: 'Nigeria', flag: '🇳🇬', access: 59.5 },
-];
+// Matches backend COUNTRY_PRESETS["IND"] so the Year-0 preview is accurate
+// even before the first backend call lands.
+const DEFAULT_INITIAL_STOCKS: Record<string, number> = {
+  traditional: 1, lantern: 2, shs: 5, minigrid: 2, grid: 90,
+};
 
 export const useSimStore = create<SimState>((set, get) => ({
   country: 'IND',
-  countries: DEFAULT_COUNTRIES,
-  initialStocks: DUMMY_COUNTRY_STOCKS.IND,
+  initialStocks: DEFAULT_INITIAL_STOCKS,
   levers: DEFAULT_LEVERS,
   year: 2026,
   running: false,
-  history: simulate(DEFAULT_LEVERS, 'IND'),
+  history: simulateLocal(DEFAULT_LEVERS),
+  source: 'local',
+  lastError: null,
   scenarios: [],
 
-  initCountries: async () => {
-    try {
-      const countries = await fetchCountries();
-      set({ countries });
-    } catch {
-      // Keep DEFAULT_COUNTRIES fallback
-    }
-  },
-
-  setCountry: (country: string) => {
-    const { levers } = get();
-    const stocks = DUMMY_COUNTRY_STOCKS[country] || DUMMY_COUNTRY_STOCKS.IND;
-    set({
-      country,
-      initialStocks: stocks,
-      history: simulate(levers, country),
-    });
-    // Trigger simulation with new country
-    get().runSim();
-  },
-
+  setCountry: (c) => set({ country: c.toUpperCase() }),
   setLever: (k, v) => set((s) => ({ levers: { ...s.levers, [k]: v } })),
   setYear: (year) => set({ year }),
 
   runSim: async () => {
     const { levers, country } = get();
-    set({ running: true });
+    set({ running: true, lastError: null });
+
     try {
-      const data = await fetchSimulation(levers, country);
+      const res = await simulateRemote(levers, country, 2026, 25);
       set({
-        history: data.history,
-        initialStocks: data.initialStocks || DUMMY_COUNTRY_STOCKS[country],
+        history: res.history,
+        initialStocks: res.initialStocks,
         running: false,
+        source: 'backend',
       });
-    } catch (err) {
-      console.warn('Backend unavailable, running client simulation:', err);
-      set({ history: simulate(levers, country), running: false });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Backend unavailable';
+      console.warn('[sim] backend failed, using local fallback:', msg);
+      set({
+        history: simulateLocal(levers),
+        running: false,
+        source: 'local',
+        lastError: msg,
+      });
     }
   },
 
@@ -98,16 +90,12 @@ export const useSimStore = create<SimState>((set, get) => ({
       ],
     }));
   },
+
   loadScenario: (id) => {
     const sc = get().scenarios.find((s) => s.id === id);
-    if (sc) {
-      set({
-        country: sc.country,
-        initialStocks: DUMMY_COUNTRY_STOCKS[sc.country] || DUMMY_COUNTRY_STOCKS.IND,
-        levers: sc.levers,
-        history: sc.history,
-      });
-    }
+    if (sc) set({ levers: sc.levers, history: sc.history, country: sc.country, source: 'local' });
   },
-  deleteScenario: (id) => set((s) => ({ scenarios: s.scenarios.filter((x) => x.id !== id) })),
+
+  deleteScenario: (id) =>
+    set((s) => ({ scenarios: s.scenarios.filter((x) => x.id !== id) })),
 }));

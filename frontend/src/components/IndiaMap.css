@@ -1,0 +1,44 @@
+/* Breathing halo — layered glow beneath each state */
+.state-halo {
+  animation: haloBreath 3.2s ease-in-out infinite;
+}
+
+/* Stagger the pulse per state so they don't beat in unison */
+.hal-delay-0 { animation-delay: -0.0s; }
+.hal-delay-1 { animation-delay: -0.5s; }
+.hal-delay-2 { animation-delay: -1.0s; }
+.hal-delay-3 { animation-delay: -1.5s; }
+.hal-delay-4 { animation-delay: -2.0s; }
+.hal-delay-5 { animation-delay: -2.5s; }
+
+@keyframes haloBreath {
+  0%, 100% { fill-opacity: 0.06; }
+  50%      { fill-opacity: 0.22; }
+}
+
+/* Core circle smooths its color as access improves */
+.state-core {
+  transition: fill 0.8s ease, fill-opacity 0.25s ease, filter 0.25s ease;
+  cursor: pointer;
+}
+
+.state-core:hover {
+  fill-opacity: 1;
+  filter: brightness(1.25) drop-shadow(0 0 6px currentColor);
+}
+
+/* Dark, glassy tooltip */
+.state-tooltip {
+  background: #141C2E !important;
+  border: 1px solid #2A3550 !important;
+  color: #E8EAF2 !important;
+  border-radius: 8px !important;
+  padding: 8px 12px !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6) !important;
+  font-size: 12px !important;
+  line-height: 1.5 !important;
+}
+
+.state-tooltip::before {
+  border-top-color: #2A3550 !important;
+}
