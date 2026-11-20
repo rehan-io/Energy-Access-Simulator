@@ -1,6 +1,7 @@
 
+"""Schemas for converting World Bank observations into model baselines."""
+
 from dataclasses import dataclass, field
-from typing import Optional
 
 
 @dataclass(frozen=True)
@@ -10,24 +11,28 @@ class CountryBaselineInputs:
     iso3: str
     year: int
 
-    population_total: Optional[float] = None
-    population_rural_pct: Optional[float] = None
+    population_total: float | None = None
+    population_rural_pct: float | None = None
 
-    electricity_access_total_pct: Optional[float] = None
-    electricity_access_rural_pct: Optional[float] = None
-    electricity_access_urban_pct: Optional[float] = None
+    electricity_access_total_pct: float | None = None
+    electricity_access_rural_pct: float | None = None
+    electricity_access_urban_pct: float | None = None
 
-    clean_cooking_access_pct: Optional[float] = None
-    gdp_per_capita_usd: Optional[float] = None
+    clean_cooking_access_pct: float | None = None
+    gdp_per_capita_usd: float | None = None
 
+    observation_years: dict[str, int] = field(default_factory=dict)
     source: str = "World Bank"
 
     def __post_init__(self):
         if len(self.iso3) != 3 or not self.iso3.isalpha():
             raise ValueError("iso3 must be a three-letter country code")
 
-        if self.year < 1960:
-            raise ValueError("year must be at least 1960")
+        if self.iso3 != self.iso3.upper():
+            raise ValueError("iso3 must be uppercase")
+
+        if self.year < 1900:
+            raise ValueError("Invalid baseline year")
 
         percentage_fields = (
             "population_rural_pct",
@@ -49,8 +54,8 @@ class CountryBaselineInputs:
 
 
 @dataclass(frozen=True)
-class CountryBaseline:
-    """Calibrated starting state for an energy-access simulation."""
+class CalibratedCountryBaseline:
+    """Derived country population and electricity-access baseline."""
 
     iso3: str
     year: int
@@ -64,16 +69,25 @@ class CountryBaseline:
 
     electricity_access_rate: float
 
-    population_rural_with_electricity: Optional[float] = None
-    population_urban_with_electricity: Optional[float] = None
+    population_rural_with_electricity: float | None = None
+    population_urban_with_electricity: float | None = None
 
+    population_rural_without_electricity: float | None = None
+    population_urban_without_electricity: float | None = None
+
+    electricity_access_rural_pct: float | None = None
+    electricity_access_urban_pct: float | None = None
+    clean_cooking_access_pct: float | None = None
+    gdp_per_capita_usd: float | None = None
+
+    observation_years: dict[str, int] = field(default_factory=dict)
     missing_indicators: tuple[str, ...] = ()
     calibration_warnings: tuple[str, ...] = ()
     source: str = "World Bank"
 
     def __post_init__(self):
-        if self.population_total < 0:
-            raise ValueError("population_total cannot be negative")
+        if self.population_total <= 0:
+            raise ValueError("population_total must be positive")
 
         counts = (
             self.population_rural,
@@ -83,7 +97,20 @@ class CountryBaseline:
         )
 
         if any(value < 0 for value in counts):
-            raise ValueError("population counts cannot be negative")
+            raise ValueError("Population counts cannot be negative")
+
+        if abs(
+            self.population_rural + self.population_urban
+            - self.population_total
+        ) > max(1.0, self.population_total * 1e-8):
+            raise ValueError("Rural and urban population must sum to total")
+
+        if abs(
+            self.population_with_electricity
+            + self.population_without_electricity
+            - self.population_total
+        ) > max(1.0, self.population_total * 1e-8):
+            raise ValueError("Electrified and unelectrified population must sum to total")
 
         if not 0 <= self.electricity_access_rate <= 1:
             raise ValueError("electricity_access_rate must be between 0 and 1")

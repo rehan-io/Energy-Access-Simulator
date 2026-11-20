@@ -55,7 +55,7 @@ class BaselineIndicator:
 
 
 @dataclass(frozen=True)
-class CountryBaseline:
+class CountryIndicatorBaseline:
     """Validated input state for one country's simulation."""
 
     iso3: str
