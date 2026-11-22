@@ -151,6 +151,26 @@ class TestAccessSimulation(unittest.TestCase):
         with self.assertRaises(ValueError):
             run_access_simulation(data)
 
+        def test_empty_future_historical_year_is_excluded(self):
+         historical_data = make_history()
 
+         for indicator in ACCESS_INDICATORS:
+            historical_data[indicator].append({
+                "year": 2025,
+                "value": None,
+            })
+
+         result = run_access_simulation(
+            historical_data,
+            years=5,
+         )
+
+         rows_2025 = [
+            row for row in result["history"]
+            if row["year"] == 2025
+        ]
+
+         self.assertEqual(len(rows_2025), 1)
+         self.assertEqual(rows_2025[0]["kind"], "projected")
 if __name__ == "__main__":
     unittest.main()
