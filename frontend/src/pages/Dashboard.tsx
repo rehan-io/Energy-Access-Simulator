@@ -73,10 +73,10 @@ export function Dashboard() {
           }}>
             <Stack spacing={0.5}>
               <Typography variant="caption" sx={{ color: '#42A5F5' }}>
-                Grid: <b>{initialStocks.grid}%</b> · SHS: <b>{initialStocks.shs}%</b>
+                Grid: <b>{initialStocks?.grid ?? '—'}%</b> · SHS: <b>{initialStocks?.shs ?? '—'}%</b>
               </Typography>
               <Typography variant="caption" sx={{ color: '#8D6E63' }}>
-                Traditional: <b>{initialStocks.traditional}%</b> · Lantern: <b>{initialStocks.lantern}%</b>
+                Traditional: <b>{initialStocks?.traditional ?? '—'}%</b> · Lantern: <b>{initialStocks?.lantern ?? '—'}%</b>
               </Typography>
             </Stack>
           </Paper>
