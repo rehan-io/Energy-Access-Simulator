@@ -6,7 +6,7 @@ import { simulateRemote } from '../api/client';
 export interface Scenario {
   id: string;
   name: string;
-  country: string;               // ← NEW
+  country: string;
   levers: Levers;
   history: YearSnapshot[];
 }
@@ -14,8 +14,8 @@ export interface Scenario {
 type Source = 'backend' | 'local' | null;
 
 interface SimState {
-  country: string;                          // ← NEW
-  initialStocks: Record<string, number>;    // ← NEW
+  country: string;
+  initialStocks: Record<string, number>;
   levers: Levers;
   year: number;
   running: boolean;
@@ -23,7 +23,7 @@ interface SimState {
   source: Source;
   lastError: string | null;
   scenarios: Scenario[];
-  setCountry: (c: string) => void;          // ← NEW
+  setCountry: (c: string) => void;
   setLever: (k: keyof Levers, v: number) => void;
   setYear: (y: number) => void;
   runSim: () => Promise<void>;
@@ -36,10 +36,9 @@ const DEFAULT_LEVERS: Levers = {
   subsidy: 20, carbonTax: 10, offGrid: 30, gridExt: 30,
 };
 
-// Matches backend COUNTRY_PRESETS["IND"] so the Year-0 preview is accurate
-// even before the first backend call lands.
+// Matches backend COUNTRY_PRESETS["IND"] after you update it
 const DEFAULT_INITIAL_STOCKS: Record<string, number> = {
-  traditional: 1, lantern: 2, shs: 5, minigrid: 2, grid: 90,
+  traditional: 15, lantern: 15, shs: 30, minigrid: 10, grid: 30,
 };
 
 export const useSimStore = create<SimState>((set, get) => ({
@@ -48,7 +47,7 @@ export const useSimStore = create<SimState>((set, get) => ({
   levers: DEFAULT_LEVERS,
   year: 2026,
   running: false,
-  history: simulateLocal(DEFAULT_LEVERS),
+  history: simulateLocal(DEFAULT_LEVERS),   // seed so the chart isn't empty on first paint
   source: 'local',
   lastError: null,
   scenarios: [],
@@ -70,8 +69,8 @@ export const useSimStore = create<SimState>((set, get) => ({
         source: 'backend',
       });
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Backend unavailable';
-      console.warn('[sim] backend failed, using local fallback:', msg);
+      const msg = err instanceof Error ? err.message : 'Backend unreachable';
+      console.warn('[sim] falling back to local:', msg);
       set({
         history: simulateLocal(levers),
         running: false,

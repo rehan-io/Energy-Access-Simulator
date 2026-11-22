@@ -1,4 +1,3 @@
-// frontend/src/pages/Dashboard.tsx
 import { useEffect, useMemo, useState } from 'react';
 import {
   AppBar, Toolbar, Typography, Box, Paper, Stack, Button, Chip,
@@ -14,7 +13,7 @@ import { INDIA_STATES } from '../data/indiaStates';
 
 export function Dashboard() {
   const {
-    country, initialStocks,                       // ← from store now
+    country, initialStocks,
     levers, setLever, year, setYear,
     history, runSim, running,
     scenarios, saveScenario, loadScenario, deleteScenario,
@@ -24,6 +23,7 @@ export function Dashboard() {
   const [scenarioName, setScenarioName] = useState('');
   const current = history[Math.min(year - 2026, history.length - 1)];
 
+  // Fire the backend once on mount so the badge + chart reflect real data immediately
   useEffect(() => {
     runSim();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -41,11 +41,8 @@ export function Dashboard() {
 
   return (
     <Box sx={{ minHeight: '100vh' }}>
-      <AppBar
-        position="sticky"
-        elevation={0}
-        sx={{ bgcolor: 'background.paper', borderBottom: '1px solid #1E2740' }}
-      >
+      <AppBar position="sticky" elevation={0}
+        sx={{ bgcolor: 'background.paper', borderBottom: '1px solid #1E2740' }}>
         <Toolbar>
           <Typography variant="h6">⚡ Energy Access Dynamics Simulator</Typography>
           <Box sx={{ flex: 1 }} />
@@ -70,12 +67,10 @@ export function Dashboard() {
           <Typography variant="overline" color="text.secondary">
             Year 0 Baseline ({country})
           </Typography>
-          <Paper
-            sx={{
-              p: 1.5, mt: 1, mb: 3,
-              bgcolor: '#0B1220', border: '1px solid #1E2740', borderRadius: 2,
-            }}
-          >
+          <Paper sx={{
+            p: 1.5, mt: 1, mb: 3,
+            bgcolor: '#0B1220', border: '1px solid #1E2740', borderRadius: 2,
+          }}>
             <Stack spacing={0.5}>
               <Typography variant="caption" sx={{ color: '#42A5F5' }}>
                 Grid: <b>{initialStocks.grid}%</b> · SHS: <b>{initialStocks.shs}%</b>
@@ -111,32 +106,26 @@ export function Dashboard() {
           </Typography>
           <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
             <input
-              placeholder="Name"
-              value={scenarioName}
+              placeholder="Name" value={scenarioName}
               onChange={(e) => setScenarioName(e.target.value)}
               style={{
                 flex: 1, background: '#0B1220', border: '1px solid #1E2740',
                 color: '#E8EAF2', padding: '8px 10px', borderRadius: 8, outline: 'none',
               }}
             />
-            <Button
-              variant="outlined" startIcon={<SaveIcon />}
+            <Button variant="outlined" startIcon={<SaveIcon />}
               onClick={() => { if (scenarioName) { saveScenario(scenarioName); setScenarioName(''); } }}
               sx={{ color: 'secondary.main', borderColor: 'secondary.main' }}
-            >
-              Save
-            </Button>
+            >Save</Button>
           </Stack>
 
           <Stack spacing={1} sx={{ mt: 2 }}>
             {scenarios.map((s) => (
-              <Paper
-                key={s.id}
+              <Paper key={s.id}
                 sx={{
                   p: 1.5, bgcolor: '#0B1220', border: '1px solid #1E2740',
                   display: 'flex', alignItems: 'center', gap: 1,
-                }}
-              >
+                }}>
                 <Typography variant="body2" sx={{ flex: 1 }}>
                   {s.name} ({s.country})
                 </Typography>
@@ -168,10 +157,8 @@ export function Dashboard() {
                 onChange={(e) => setYear(+e.target.value)}
                 style={{ flex: 1, accentColor: '#FFB74D' }}
               />
-              <Typography
-                variant="h6"
-                sx={{ fontWeight: 700, color: 'primary.main', minWidth: 60, textAlign: 'right' }}
-              >
+              <Typography variant="h6"
+                sx={{ fontWeight: 700, color: 'primary.main', minWidth: 60, textAlign: 'right' }}>
                 {year}
               </Typography>
             </Stack>
@@ -181,12 +168,10 @@ export function Dashboard() {
             {country === 'IND' ? (
               <IndiaMap states={INDIA_STATES} year={year} accessByState={accessByState} />
             ) : (
-              <Box
-                sx={{
-                  height: '100%', display: 'flex', alignItems: 'center',
-                  justifyContent: 'center', p: 4, textAlign: 'center',
-                }}
-              >
+              <Box sx={{
+                height: '100%', display: 'flex', alignItems: 'center',
+                justifyContent: 'center', p: 4, textAlign: 'center',
+              }}>
                 <Box>
                   <Typography variant="h6" color="text.secondary">
                     Subnational Geo Data for {country}

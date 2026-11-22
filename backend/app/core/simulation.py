@@ -2,12 +2,12 @@
 from typing import List, Dict, Optional
 
 COUNTRY_PRESETS: Dict[str, Dict[str, float]] = {
-    "IND": {
-        "traditional": 1.0,
-        "lantern": 2.0,
-        "shs": 5.0,
-        "minigrid": 2.0,
-        "grid": 90.0,
+        "IND": {
+        "traditional": 10.0,
+        "lantern": 4.5,
+        "shs": 5.5,
+        "minigrid": 5.0,
+        "grid": 75.0,
     },
     "KEN": {
         "traditional": 18.0,
