@@ -148,13 +148,19 @@ def run_access_simulation(
             historical_by_year.setdefault(year, {})[indicator] = value
 
     for year in sorted(historical_by_year):
-        row = {
-            "year": year,
-            "kind": "historical",
+     if year > baseline_year:
+        continue
+
+     row = {
+        "year": year,
+        "kind": "historical",
         }
-        for indicator in ACCESS_INDICATORS:
+
+     row.update(historical_by_year[year])
+     history.append(row)
+    for indicator in ACCESS_INDICATORS:
             row[indicator] = historical_by_year[year].get(indicator)
-        history.append(row)
+            history.append(row)
 
     current = {
         indicator: trends[indicator]["latest_value"]
