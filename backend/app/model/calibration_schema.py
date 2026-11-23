@@ -1,4 +1,3 @@
-
 """Schemas for converting World Bank observations into model baselines."""
 
 from dataclasses import dataclass, field
@@ -19,7 +18,14 @@ class CountryBaselineInputs:
     electricity_access_urban_pct: float | None = None
 
     clean_cooking_access_pct: float | None = None
+    elec_use_kwh_pc: float | None = None
     gdp_per_capita_usd: float | None = None
+
+    income_share_q1: float | None = None
+    income_share_q2: float | None = None
+    income_share_q3: float | None = None
+    income_share_q4: float | None = None
+    income_share_q5: float | None = None
 
     observation_years: dict[str, int] = field(default_factory=dict)
     source: str = "World Bank"
@@ -40,6 +46,11 @@ class CountryBaselineInputs:
             "electricity_access_rural_pct",
             "electricity_access_urban_pct",
             "clean_cooking_access_pct",
+            "income_share_q1",
+            "income_share_q2",
+            "income_share_q3",
+            "income_share_q4",
+            "income_share_q5",
         )
 
         for name in percentage_fields:
@@ -47,7 +58,7 @@ class CountryBaselineInputs:
             if value is not None and not 0 <= value <= 100:
                 raise ValueError(f"{name} must be between 0 and 100")
 
-        for name in ("population_total", "gdp_per_capita_usd"):
+        for name in ("population_total", "gdp_per_capita_usd", "elec_use_kwh_pc"):
             value = getattr(self, name)
             if value is not None and value < 0:
                 raise ValueError(f"{name} cannot be negative")
@@ -78,7 +89,9 @@ class CalibratedCountryBaseline:
     electricity_access_rural_pct: float | None = None
     electricity_access_urban_pct: float | None = None
     clean_cooking_access_pct: float | None = None
+    elec_use_kwh_pc: float | None = None
     gdp_per_capita_usd: float | None = None
+    bottom_80_income_share_pct: float | None = None
 
     observation_years: dict[str, int] = field(default_factory=dict)
     missing_indicators: tuple[str, ...] = ()
@@ -114,3 +127,17 @@ class CalibratedCountryBaseline:
 
         if not 0 <= self.electricity_access_rate <= 1:
             raise ValueError("electricity_access_rate must be between 0 and 1")
+
+
+@dataclass(frozen=True)
+class SimulationMacroContext:
+    """Macroeconomic and demographic context extracted from worldbank_wide.csv."""
+
+    iso3: str
+    baseline_year: int
+    rural_pop_share: float        # fraction in [0.05, 0.95]
+    rural_pop_drift: float        # annual change in fraction (e.g. -0.0031)
+    gdp_per_capita_usd: float     # baseline-year GDP per capita
+    gdp_growth_rate: float        # clamped annual growth rate
+    bottom_80_income_share: float # percentage in (0, 100]
+    elec_use_kwh_pc: float | None = None

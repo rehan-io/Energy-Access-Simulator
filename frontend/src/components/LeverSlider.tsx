@@ -1,4 +1,3 @@
-
 import { Box, Slider, Stack, Typography } from '@mui/material';
 
 interface Props {
@@ -10,6 +9,7 @@ interface Props {
   min?: number;
   max?: number;
   step?: number;
+  unit?: string;
 }
 
 export function LeverSlider({
@@ -18,18 +18,20 @@ export function LeverSlider({
   onChange,
   color = '#FFB74D',
   description,
-  min = -2,
-  max = 2,
-  step = 0.05,
+  min = 0,
+  max = 100,
+  step = 1,
+  unit = '%',
 }: Props) {
-  const formattedValue = `${value > 0 ? '+' : ''}${value.toFixed(2)} pp/yr`;
+  const formattedValue = `${Math.round(value)}${unit}`;
 
   return (
     <Box>
-<Stack
-  direction="row"
-  sx={{ justifyContent: 'space-between', alignItems: 'baseline' }}
->        <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+      <Stack
+        direction="row"
+        sx={{ justifyContent: 'space-between', alignItems: 'baseline' }}
+      >
+        <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
           {label}
         </Typography>
         <Typography
