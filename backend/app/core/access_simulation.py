@@ -112,7 +112,10 @@ def run_access_simulation(
                 f"Policy adjustment for {indicator} must be finite"
             )
 
-    trends = {}
+        # First normalize and merge observations by indicator and year.
+    # This must happen before trend estimation because trend estimation
+    # expects unique observation years.
+    normalized_data = {}
 
     for indicator in ACCESS_INDICATORS:
         observations = historical_data.get(indicator, [])
@@ -120,47 +123,79 @@ def run_access_simulation(
         if not observations:
             raise ValueError(f"Missing historical data for {indicator}")
 
-        trends[indicator] = estimate_annual_trend(
-            observations,
-            window=trend_window,
-        )
+        merged = {}
 
-    # Start after the latest observation across all required indicators.
-    # This avoids presenting a forecast as an observed historical value.
-    baseline_year = max(
-        result["latest_year"] for result in trends.values()
-    )
-
-    history = []
-
-    # Merge historical observations by year. Missing observations remain
-    # None; they are never filled with zero or interpolated silently.
-    historical_by_year = {}
-
-    for indicator in ACCESS_INDICATORS:
-        for item in historical_data[indicator]:
+        for item in observations:
             year = int(item["year"])
             value = item.get("value")
 
             if value is not None:
                 value = float(value)
 
-            historical_by_year.setdefault(year, {})[indicator] = value
+            if year not in merged:
+                merged[year] = value
+                continue
+
+            existing_value = merged[year]
+
+            # Prefer a valid observation over a missing duplicate.
+            if existing_value is None and value is not None:
+                merged[year] = value
+
+            elif (
+                existing_value is not None
+                and value is not None
+                and existing_value != value
+            ):
+                raise ValueError(
+                    f"Conflicting duplicate observations for "
+                    f"{indicator} in {year}: "
+                    f"{existing_value} and {value}"
+                )
+
+        normalized_data[indicator] = [
+            {"year": year, "value": value}
+            for year, value in sorted(merged.items())
+        ]
+
+    # Estimate trends using the normalized observations.
+    trends = {}
+
+    for indicator in ACCESS_INDICATORS:
+        trends[indicator] = estimate_annual_trend(
+            normalized_data[indicator],
+            window=trend_window,
+        )
+
+    # Start after the latest observation across all required indicators.
+    baseline_year = max(
+        result["latest_year"] for result in trends.values()
+    )
+
+    # Construct exactly one historical row per year.
+    historical_by_year = {}
+
+    for indicator in ACCESS_INDICATORS:
+        for item in normalized_data[indicator]:
+            year = item["year"]
+            historical_by_year.setdefault(year, {})[indicator] = item["value"]
+
+    history = []
 
     for year in sorted(historical_by_year):
-     if year > baseline_year:
-        continue
+        if year > baseline_year:
+            continue
 
-     row = {
-        "year": year,
-        "kind": "historical",
+        row = {
+            "year": year,
+            "kind": "historical",
         }
 
-     row.update(historical_by_year[year])
-     history.append(row)
-    for indicator in ACCESS_INDICATORS:
+        for indicator in ACCESS_INDICATORS:
             row[indicator] = historical_by_year[year].get(indicator)
-            history.append(row)
+
+        history.append(row)
+
 
     current = {
         indicator: trends[indicator]["latest_value"]
