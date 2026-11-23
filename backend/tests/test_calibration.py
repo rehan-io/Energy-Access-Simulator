@@ -1,4 +1,4 @@
-
+from pathlib import Path
 import unittest
 
 from app.model.calibration import (
@@ -8,10 +8,7 @@ from app.model.calibration import (
 )
 
 
-DATA_DIR = (
-    r"D:\Users\Shubhankar\CS 699 Proj\files\data\processed\worldbank"
-)
-
+DATA_DIR = Path(__file__).resolve().parents[1] / "data" / "processed" / "worldbank"
 
 class TestCountryCalibration(unittest.TestCase):
 

@@ -7,10 +7,13 @@ from typing import Any
 
 import pandas as pd
 
-from app.core.access_simulation import ACCESS_INDICATORS
+from app.core.access_simulation import (
+    ACCESS_INDICATORS,
+    run_access_simulation,
+    run_coupled_access_simulation,
+)
 from app.data.dataset_loader import load_long_dataset
-from app.core.access_simulation import run_access_simulation
-
+from app.model.calibration import get_simulation_macro_context
 
 
 REQUIRED_COLUMNS = {"iso3", "indicator", "year", "value"}
@@ -91,6 +94,7 @@ def load_country_historical_data(
 
     return historical_data
 
+
 def run_country_access_simulation(
     country_code: str,
     years: int = 25,
@@ -114,4 +118,48 @@ def run_country_access_simulation(
 
     result["countryCode"] = country_code.strip().upper()
 
+    return result
+
+
+def run_country_coupled_simulation(
+    country_code: str,
+    years: int = 25,
+    trend_window: int = 10,
+    policy_levers: dict[str, Any] | None = None,
+    data_dir: str | None = None,
+) -> dict[str, Any]:
+    """Run the coupled Bass-Logistic & five-tier stock-and-flow simulation."""
+
+    iso3 = country_code.strip().upper()
+    historical_data = load_country_historical_data(
+        country_code=iso3,
+        data_dir=data_dir,
+    )
+
+    latest_years = [
+        max(
+            int(obs["year"])
+            for obs in obs_list
+            if obs["value"] is not None
+        )
+        for obs_list in historical_data.values()
+    ]
+    baseline_year = max(latest_years)
+
+    macro = get_simulation_macro_context(
+        country_code=iso3,
+        baseline_year=baseline_year,
+        data_dir=data_dir,
+    )
+
+    result = run_coupled_access_simulation(
+        historical_data=historical_data,
+        country_code=iso3,
+        macro=macro,
+        years=years,
+        trend_window=trend_window,
+        policy_levers=policy_levers,
+    )
+
+    result["countryCode"] = iso3
     return result

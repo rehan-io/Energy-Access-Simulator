@@ -1,14 +1,9 @@
-
 from datetime import date
 import re
 import time
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
-
-from typing import Any
-
 from pydantic import BaseModel, Field
 
 from app.data.fetch_worldbank import (
@@ -18,20 +13,20 @@ from app.data.fetch_worldbank import (
 )
 from app.core.access_simulation import ACCESS_INDICATORS
 from app.model.simulation_inputs import (
-    load_country_historical_data,
     run_country_access_simulation,
+    run_country_coupled_simulation,
 )
+
 app = FastAPI(title="Energy Access Simulator API")
 
 # Permit the local Vite frontend to communicate with FastAPI.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],   # ← must include this
+    allow_origins=["http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 
 class WorldBankRequest(BaseModel):
@@ -125,12 +120,12 @@ def get_worldbank_data(request: WorldBankRequest):
 
     finally:
         session.close()
-    
+
     if failures and not rows:
-     raise HTTPException(
-        status_code=502,
-        detail={"message": "World Bank request failed", "failures": failures},
-    )
+        raise HTTPException(
+            status_code=502,
+            detail={"message": "World Bank request failed", "failures": failures},
+        )
     return {
         "countries": countries,
         "start": request.start,
@@ -142,7 +137,6 @@ def get_worldbank_data(request: WorldBankRequest):
     }
 
 
-# Countries supported by the processed World Bank dataset.
 AVAILABLE_COUNTRIES = [
     {"code": "IND", "name": "India"},
     {"code": "KEN", "name": "Kenya"},
@@ -202,16 +196,25 @@ def get_countries():
     return countries
 
 
+class PolicyLevers(BaseModel):
+    subsidy: float = Field(default=0.0, ge=0.0, le=100.0)
+    carbon_tax: float = Field(default=0.0, ge=0.0, le=100.0)
+    off_grid: float = Field(default=0.0, ge=0.0, le=100.0)
+    grid_ext: float = Field(default=0.0, ge=0.0, le=100.0)
+    recycle_tax_revenue: bool = Field(default=True)
+
+
 class SimulationRequest(BaseModel):
     country: str = Field(default="IND", min_length=3, max_length=3)
     years: int = Field(default=25, ge=1, le=100)
     trendWindow: int = Field(default=10, ge=2, le=30)
     policyAdjustments: dict[str, float] = Field(default_factory=dict)
+    policyLevers: PolicyLevers | None = None
 
 
 @app.post("/api/simulate")
 def simulate_endpoint(payload: SimulationRequest):
-    """Run a country-specific evidence-first access simulation."""
+    """Run a country-specific access and five-tier energy-ladder simulation."""
 
     country_code = validate_country(payload.country)
 
@@ -230,14 +233,20 @@ def simulate_endpoint(payload: SimulationRequest):
         )
 
     try:
-        result = run_country_access_simulation(
+        if payload.policyLevers is not None:
+            return run_country_coupled_simulation(
+                country_code=country_code,
+                years=payload.years,
+                trend_window=payload.trendWindow,
+                policy_levers=payload.policyLevers.model_dump(),
+            )
+
+        return run_country_access_simulation(
             country_code=country_code,
             years=payload.years,
             trend_window=payload.trendWindow,
             policy_adjustments=payload.policyAdjustments,
         )
-
-        return result
 
     except ValueError as exc:
         raise HTTPException(

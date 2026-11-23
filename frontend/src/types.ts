@@ -1,4 +1,3 @@
-
 export const ACCESS_INDICATORS = [
   'elec_access_total',
   'elec_access_rural',
@@ -7,6 +6,16 @@ export const ACCESS_INDICATORS = [
 ] as const;
 
 export type AccessIndicator = (typeof ACCESS_INDICATORS)[number];
+
+export const ENERGY_TIERS = [
+  'traditional',
+  'lantern',
+  'shs',
+  'minigrid',
+  'grid',
+] as const;
+
+export type EnergyTierKey = (typeof ENERGY_TIERS)[number];
 
 export type HistoryKind = 'historical' | 'projected';
 
@@ -17,6 +26,11 @@ export interface YearSnapshot {
   elec_access_rural: number | null;
   elec_access_urban: number | null;
   clean_cooking_access: number | null;
+  traditional?: number | null;
+  lantern?: number | null;
+  shs?: number | null;
+  minigrid?: number | null;
+  grid?: number | null;
 }
 
 export interface TrendSummary {
@@ -35,6 +49,20 @@ export type PolicyAdjustments = Partial<
   Record<AccessIndicator, number>
 >;
 
+export interface PolicyLevers {
+  subsidy: number;
+  carbon_tax: number;
+  off_grid: number;
+  grid_ext: number;
+  recycle_tax_revenue: boolean;
+}
+
+export type PolicyLeverNumericKey =
+  | 'subsidy'
+  | 'carbon_tax'
+  | 'off_grid'
+  | 'grid_ext';
+
 export interface CountryOption {
   code: string;
   name: string;
@@ -47,7 +75,8 @@ export interface SimulationRequest {
   country: string;
   years: number;
   trendWindow: number;
-  policyAdjustments: PolicyAdjustments;
+  policyLevers?: PolicyLevers;
+  policyAdjustments?: PolicyAdjustments;
 }
 
 export interface SimulationResponse {
@@ -56,6 +85,8 @@ export interface SimulationResponse {
   trendWindow: number;
   trends: TrendMetadata;
   policyAdjustments: PolicyAdjustments;
+  policyLevers?: PolicyLevers;
+  modelMode?: 'coupled' | 'linear_legacy';
   history: YearSnapshot[];
 }
 

@@ -1,9 +1,8 @@
-
 import { create } from 'zustand';
 import type {
-  AccessIndicator,
   CountryOption,
-  PolicyAdjustments,
+  PolicyLeverNumericKey,
+  PolicyLevers,
   SimulationResponse,
   TrendMetadata,
   YearSnapshot,
@@ -16,7 +15,7 @@ export interface Scenario {
   country: string;
   years: number;
   trendWindow: number;
-  policyAdjustments: PolicyAdjustments;
+  policyLevers: PolicyLevers;
   result: SimulationResponse;
 }
 
@@ -25,7 +24,7 @@ interface SimState {
   countries: CountryOption[];
   years: number;
   trendWindow: number;
-  policyAdjustments: PolicyAdjustments;
+  policyLevers: PolicyLevers;
 
   selectedYear: number | null;
   baselineYear: number | null;
@@ -40,10 +39,9 @@ interface SimState {
   setCountry: (country: string) => void;
   setYears: (years: number) => void;
   setTrendWindow: (window: number) => void;
-  setPolicyAdjustment: (
-    indicator: AccessIndicator,
-    value: number,
-  ) => void;
+  setPolicyLever: (lever: PolicyLeverNumericKey, value: number) => void;
+  setRecycleTaxRevenue: (enabled: boolean) => void;
+  resetPolicyLevers: () => void;
   setSelectedYear: (year: number) => void;
 
   runSim: () => Promise<void>;
@@ -52,11 +50,12 @@ interface SimState {
   deleteScenario: (id: string) => void;
 }
 
-const DEFAULT_POLICY_ADJUSTMENTS: PolicyAdjustments = {
-  elec_access_total: 0,
-  elec_access_rural: 0,
-  elec_access_urban: 0,
-  clean_cooking_access: 0,
+export const DEFAULT_POLICY_LEVERS: PolicyLevers = {
+  subsidy: 0,
+  carbon_tax: 0,
+  off_grid: 0,
+  grid_ext: 0,
+  recycle_tax_revenue: true,
 };
 
 export const useSimStore = create<SimState>((set, get) => ({
@@ -64,7 +63,7 @@ export const useSimStore = create<SimState>((set, get) => ({
   countries: [],
   years: 25,
   trendWindow: 10,
-  policyAdjustments: { ...DEFAULT_POLICY_ADJUSTMENTS },
+  policyLevers: { ...DEFAULT_POLICY_LEVERS },
 
   selectedYear: null,
   baselineYear: null,
@@ -103,18 +102,29 @@ export const useSimStore = create<SimState>((set, get) => ({
 
   setTrendWindow: (trendWindow) => set({ trendWindow }),
 
-  setPolicyAdjustment: (indicator, value) =>
+  setPolicyLever: (lever, value) =>
     set((state) => ({
-      policyAdjustments: {
-        ...state.policyAdjustments,
-        [indicator]: value,
+      policyLevers: {
+        ...state.policyLevers,
+        [lever]: value,
       },
     })),
+
+  setRecycleTaxRevenue: (enabled) =>
+    set((state) => ({
+      policyLevers: {
+        ...state.policyLevers,
+        recycle_tax_revenue: enabled,
+      },
+    })),
+
+  resetPolicyLevers: () =>
+    set({ policyLevers: { ...DEFAULT_POLICY_LEVERS } }),
 
   setSelectedYear: (selectedYear) => set({ selectedYear }),
 
   runSim: async () => {
-    const { country, years, trendWindow, policyAdjustments } = get();
+    const { country, years, trendWindow, policyLevers } = get();
 
     set({ running: true, error: null });
 
@@ -123,7 +133,7 @@ export const useSimStore = create<SimState>((set, get) => ({
         country,
         years,
         trendWindow,
-        policyAdjustments,
+        policyLevers,
       });
 
       set({
@@ -165,7 +175,9 @@ export const useSimStore = create<SimState>((set, get) => ({
       baselineYear: state.baselineYear,
       trendWindow: state.trendWindow,
       trends: state.trends,
-      policyAdjustments: { ...state.policyAdjustments },
+      policyAdjustments: {},
+      policyLevers: { ...state.policyLevers },
+      modelMode: 'coupled',
       history: [...state.history],
     };
 
@@ -175,7 +187,7 @@ export const useSimStore = create<SimState>((set, get) => ({
       country: state.country,
       years: state.years,
       trendWindow: state.trendWindow,
-      policyAdjustments: { ...state.policyAdjustments },
+      policyLevers: { ...state.policyLevers },
       result,
     };
 
@@ -193,7 +205,7 @@ export const useSimStore = create<SimState>((set, get) => ({
       country: scenario.country,
       years: scenario.years,
       trendWindow: scenario.trendWindow,
-      policyAdjustments: { ...scenario.policyAdjustments },
+      policyLevers: { ...scenario.policyLevers },
       history: [...scenario.result.history],
       trends: scenario.result.trends,
       baselineYear: scenario.result.baselineYear,
