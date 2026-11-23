@@ -25,6 +25,12 @@ export const theme = createTheme({
   },
   shape: { borderRadius: 12 },
   components: {
-    Paper: { styleOverrides: { root: { backgroundImage: 'none' } } },
+    MuiPaper: {
+  styleOverrides: {
+    root: {
+      backgroundImage: 'none',
+    },
+  },
+},
   },
 });

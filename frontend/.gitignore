@@ -22,3 +22,19 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+
+# Python virtual environments
+.venv/
+venv/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# Local environment variables
+.env
+.env.*
+
+# Generated World Bank datasets
+data/raw/worldbank/*.csv

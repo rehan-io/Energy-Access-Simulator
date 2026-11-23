@@ -1,166 +1,209 @@
+
 import { create } from 'zustand';
-import type { Levers, YearSnapshot } from '../types';
-import { simulate as simulateLocal } from '../utils/simulation';
-import { simulateRemote } from '../api/client';
+import type {
+  AccessIndicator,
+  CountryOption,
+  PolicyAdjustments,
+  SimulationResponse,
+  TrendMetadata,
+  YearSnapshot,
+} from '../types';
+import { fetchCountries, fetchSimulation } from '../services/api';
 
 export interface Scenario {
   id: string;
   name: string;
   country: string;
-  levers: Levers;
-  history: YearSnapshot[];
+  years: number;
+  trendWindow: number;
+  policyAdjustments: PolicyAdjustments;
+  result: SimulationResponse;
 }
-
-type Source = 'backend' | 'local' | null;
 
 interface SimState {
   country: string;
-  initialStocks: Record<string, number>;
-  levers: Levers;
-  year: number;
-  running: boolean;
+  countries: CountryOption[];
+  years: number;
+  trendWindow: number;
+  policyAdjustments: PolicyAdjustments;
+
+  selectedYear: number | null;
+  baselineYear: number | null;
   history: YearSnapshot[];
-  referenceHistory: Record<string, YearSnapshot[]>;
-  source: Source;
-  lastError: string | null;
+  trends: TrendMetadata | null;
+
+  running: boolean;
+  error: string | null;
   scenarios: Scenario[];
-  setCountry: (c: string) => Promise<void>;
-  setLever: (k: keyof Levers, v: number) => void;
-  setYear: (y: number) => void;
+
+  initCountries: () => Promise<void>;
+  setCountry: (country: string) => void;
+  setYears: (years: number) => void;
+  setTrendWindow: (window: number) => void;
+  setPolicyAdjustment: (
+    indicator: AccessIndicator,
+    value: number,
+  ) => void;
+  setSelectedYear: (year: number) => void;
+
   runSim: () => Promise<void>;
   saveScenario: (name: string) => void;
   loadScenario: (id: string) => void;
   deleteScenario: (id: string) => void;
 }
 
-const DEFAULT_LEVERS: Levers = {
-  subsidy: 20, carbonTax: 10, offGrid: 30, gridExt: 30,
+const DEFAULT_POLICY_ADJUSTMENTS: PolicyAdjustments = {
+  elec_access_total: 0,
+  elec_access_rural: 0,
+  elec_access_urban: 0,
+  clean_cooking_access: 0,
 };
-
-const DEFAULT_INITIAL_STOCKS: Record<string, number> = {
-  traditional: 15, lantern: 15, shs: 30, minigrid: 10, grid: 30,
-};
-
-// Simple debounce so fast slider drags don't flood the backend
-let runTimer: ReturnType<typeof setTimeout> | null = null;
 
 export const useSimStore = create<SimState>((set, get) => ({
   country: 'IND',
-  initialStocks: DEFAULT_INITIAL_STOCKS,
-  levers: DEFAULT_LEVERS,
-  year: 2026,
+  countries: [],
+  years: 25,
+  trendWindow: 10,
+  policyAdjustments: { ...DEFAULT_POLICY_ADJUSTMENTS },
+
+  selectedYear: null,
+  baselineYear: null,
+  history: [],
+  trends: null,
+
   running: false,
-  history: simulateLocal(DEFAULT_LEVERS, DEFAULT_INITIAL_STOCKS),
-  referenceHistory: {},
-  source: 'local',
-  lastError: null,
+  error: null,
   scenarios: [],
 
-  setCountry: async (c) => {
-    set({ country: c.toUpperCase(), initialStocks: DEFAULT_INITIAL_STOCKS });
-    await get().runSim();
-  },
-
-  setLever: (k, v) => {
-    set((s) => ({ levers: { ...s.levers, [k]: v } }));
-    if (runTimer) clearTimeout(runTimer);
-    runTimer = setTimeout(() => get().runSim(), 250);
-  },
-
-  setYear: (year) => set({ year }),
-
-//   runSim: async () => {
-//   const { levers, country, initialStocks, referenceHistory } = get();
-//   set({ running: true, lastError: null });
-
-//   try {
-//     // Fetch/cache reference (default levers) for this country, once
-//     let ref = referenceHistory[country];
-//     if (!ref) {
-//       const refRes = await simulateRemote(DEFAULT_LEVERS, country, 2026, 50);
-//       ref = refRes.history;
-//       set((s) => ({
-//         referenceHistory: { ...s.referenceHistory, [country]: ref! },
-//       }));
-//     }
-
-//     const res = await simulateRemote(levers, country, 2026, 50);
-//     set({
-//       history: res.history,
-//       initialStocks: res.initialStocks,
-//       running: false,
-//       source: 'backend',
-//     });
-//   } catch (err: unknown) {
-//     const msg = err instanceof Error ? err.message : 'Backend unreachable';
-//     console.warn('[sim] fallback to local:', msg);
-//     set({
-//       history: simulateLocal(levers, initialStocks ?? DEFAULT_INITIAL_STOCKS, 2026, 50),
-//       running: false,
-//       source: 'local',
-//       lastError: msg,
-//     });
-//   }
-// },
-
-runSim: async () => {
-  const { levers, country, initialStocks, referenceHistory } = get();
-  set({ running: true, lastError: null });
-
-  const stocks = initialStocks ?? DEFAULT_INITIAL_STOCKS;
-
-  try {
-    // Fetch reference (default policy) once per country
-    let ref = referenceHistory[country];
-    if (!ref) {
-      const refRes = await simulateRemote(DEFAULT_LEVERS, country, 2026, 50);
-      ref = refRes.history;
+  initCountries: async () => {
+    try {
+      const countries = await fetchCountries();
+      set({ countries, error: null });
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Could not load countries';
+      set({ error: message });
     }
+  },
 
-    // Fetch current policy run
-    const res = await simulateRemote(levers, country, 2026, 50);
-
+  setCountry: (country) => {
     set({
-      history: res.history,
-      initialStocks: res.initialStocks,
-      referenceHistory: { ...referenceHistory, [country]: ref },
-      running: false,
-      source: 'backend',
+      country,
+      history: [],
+      trends: null,
+      baselineYear: null,
+      selectedYear: null,
+      error: null,
     });
-  } catch (err: unknown) {
-    // Backend down → compute BOTH from local so the delta is consistent
-    const msg = err instanceof Error ? err.message : 'Backend unreachable';
-    console.warn('[sim] fallback to local:', msg);
-    set({
-      history: simulateLocal(levers, stocks, 2026, 50),
-      referenceHistory: {
-        ...referenceHistory,
-        [country]: simulateLocal(DEFAULT_LEVERS, stocks, 2026, 50),
+
+    void get().runSim();
+  },
+
+  setYears: (years) => set({ years }),
+
+  setTrendWindow: (trendWindow) => set({ trendWindow }),
+
+  setPolicyAdjustment: (indicator, value) =>
+    set((state) => ({
+      policyAdjustments: {
+        ...state.policyAdjustments,
+        [indicator]: value,
       },
-      running: false,
-      source: 'local',
-      lastError: msg,
-    });
-  }
-},
+    })),
+
+  setSelectedYear: (selectedYear) => set({ selectedYear }),
+
+  runSim: async () => {
+    const { country, years, trendWindow, policyAdjustments } = get();
+
+    set({ running: true, error: null });
+
+    try {
+      const result = await fetchSimulation({
+        country,
+        years,
+        trendWindow,
+        policyAdjustments,
+      });
+
+      set({
+        history: result.history,
+        trends: result.trends,
+        baselineYear: result.baselineYear,
+        selectedYear: result.baselineYear,
+        running: false,
+        error: null,
+      });
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Simulation failed';
+
+      set({
+        running: false,
+        error: message,
+        history: [],
+        trends: null,
+        baselineYear: null,
+        selectedYear: null,
+      });
+    }
+  },
 
   saveScenario: (name) => {
-    const { levers, history, country } = get();
-    set((s) => ({
-      scenarios: [
-        ...s.scenarios,
-        { id: Date.now().toString(), name, country, levers: { ...levers }, history: [...history] },
-      ],
+    const state = get();
+
+    if (
+      !state.history.length ||
+      !state.trends ||
+      state.baselineYear === null
+    ) {
+      return;
+    }
+
+    const result: SimulationResponse = {
+      countryCode: state.country,
+      baselineYear: state.baselineYear,
+      trendWindow: state.trendWindow,
+      trends: state.trends,
+      policyAdjustments: { ...state.policyAdjustments },
+      history: [...state.history],
+    };
+
+    const scenario: Scenario = {
+      id: Date.now().toString(),
+      name,
+      country: state.country,
+      years: state.years,
+      trendWindow: state.trendWindow,
+      policyAdjustments: { ...state.policyAdjustments },
+      result,
+    };
+
+    set((current) => ({
+      scenarios: [...current.scenarios, scenario],
     }));
   },
 
   loadScenario: (id) => {
-    const sc = get().scenarios.find((s) => s.id === id);
-    if (sc) {
-      set({ levers: sc.levers, history: sc.history, country: sc.country, source: 'local' });
-    }
+    const scenario = get().scenarios.find((item) => item.id === id);
+
+    if (!scenario) return;
+
+    set({
+      country: scenario.country,
+      years: scenario.years,
+      trendWindow: scenario.trendWindow,
+      policyAdjustments: { ...scenario.policyAdjustments },
+      history: [...scenario.result.history],
+      trends: scenario.result.trends,
+      baselineYear: scenario.result.baselineYear,
+      selectedYear: scenario.result.baselineYear,
+      error: null,
+    });
   },
 
   deleteScenario: (id) =>
-    set((s) => ({ scenarios: s.scenarios.filter((x) => x.id !== id) })),
+    set((state) => ({
+      scenarios: state.scenarios.filter((item) => item.id !== id),
+    })),
 }));
