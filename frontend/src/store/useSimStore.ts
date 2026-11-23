@@ -20,6 +20,7 @@ interface SimState {
   year: number;
   running: boolean;
   history: YearSnapshot[];
+  referenceHistory: Record<string, YearSnapshot[]>;
   source: Source;
   lastError: string | null;
   scenarios: Scenario[];
@@ -50,6 +51,7 @@ export const useSimStore = create<SimState>((set, get) => ({
   year: 2026,
   running: false,
   history: simulateLocal(DEFAULT_LEVERS, DEFAULT_INITIAL_STOCKS),
+  referenceHistory: {},
   source: 'local',
   lastError: null,
   scenarios: [],
@@ -67,29 +69,80 @@ export const useSimStore = create<SimState>((set, get) => ({
 
   setYear: (year) => set({ year }),
 
-  runSim: async () => {
-    const { levers, country, initialStocks } = get();
-    set({ running: true, lastError: null });
+//   runSim: async () => {
+//   const { levers, country, initialStocks, referenceHistory } = get();
+//   set({ running: true, lastError: null });
 
-    try {
-      const res = await simulateRemote(levers, country, 2026, 25);
-      set({
-        history: res.history,
-        initialStocks: res.initialStocks,
-        running: false,
-        source: 'backend',
-      });
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Backend unreachable';
-      console.warn('[sim] fallback to local:', msg);
-      set({
-        history: simulateLocal(levers, initialStocks ?? DEFAULT_INITIAL_STOCKS),
-        running: false,
-        source: 'local',
-        lastError: msg,
-      });
+//   try {
+//     // Fetch/cache reference (default levers) for this country, once
+//     let ref = referenceHistory[country];
+//     if (!ref) {
+//       const refRes = await simulateRemote(DEFAULT_LEVERS, country, 2026, 50);
+//       ref = refRes.history;
+//       set((s) => ({
+//         referenceHistory: { ...s.referenceHistory, [country]: ref! },
+//       }));
+//     }
+
+//     const res = await simulateRemote(levers, country, 2026, 50);
+//     set({
+//       history: res.history,
+//       initialStocks: res.initialStocks,
+//       running: false,
+//       source: 'backend',
+//     });
+//   } catch (err: unknown) {
+//     const msg = err instanceof Error ? err.message : 'Backend unreachable';
+//     console.warn('[sim] fallback to local:', msg);
+//     set({
+//       history: simulateLocal(levers, initialStocks ?? DEFAULT_INITIAL_STOCKS, 2026, 50),
+//       running: false,
+//       source: 'local',
+//       lastError: msg,
+//     });
+//   }
+// },
+
+runSim: async () => {
+  const { levers, country, initialStocks, referenceHistory } = get();
+  set({ running: true, lastError: null });
+
+  const stocks = initialStocks ?? DEFAULT_INITIAL_STOCKS;
+
+  try {
+    // Fetch reference (default policy) once per country
+    let ref = referenceHistory[country];
+    if (!ref) {
+      const refRes = await simulateRemote(DEFAULT_LEVERS, country, 2026, 50);
+      ref = refRes.history;
     }
-  },
+
+    // Fetch current policy run
+    const res = await simulateRemote(levers, country, 2026, 50);
+
+    set({
+      history: res.history,
+      initialStocks: res.initialStocks,
+      referenceHistory: { ...referenceHistory, [country]: ref },
+      running: false,
+      source: 'backend',
+    });
+  } catch (err: unknown) {
+    // Backend down → compute BOTH from local so the delta is consistent
+    const msg = err instanceof Error ? err.message : 'Backend unreachable';
+    console.warn('[sim] fallback to local:', msg);
+    set({
+      history: simulateLocal(levers, stocks, 2026, 50),
+      referenceHistory: {
+        ...referenceHistory,
+        [country]: simulateLocal(DEFAULT_LEVERS, stocks, 2026, 50),
+      },
+      running: false,
+      source: 'local',
+      lastError: msg,
+    });
+  }
+},
 
   saveScenario: (name) => {
     const { levers, history, country } = get();

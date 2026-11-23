@@ -1,3 +1,4 @@
+// frontend/src/pages/Dashboard.tsx
 import { useEffect, useMemo, useState } from 'react';
 import {
   AppBar, Toolbar, Typography, Box, Paper, Stack, Button, Chip,
@@ -8,20 +9,29 @@ import { useSimStore } from '../store/useSimStore';
 import { LeverSlider } from '../components/LeverSlider';
 import { KpiCards } from '../components/KpiCards';
 import { EnergyStackChart } from '../components/EnergyStackChart';
+import { DeltaChart } from '../components/DeltaChart';
 import { IndiaMap } from '../components/IndiaMap';
 import { INDIA_STATES } from '../data/indiaStates';
+
+const scrollbarSx = {
+  '&::-webkit-scrollbar': { width: 8 },
+  '&::-webkit-scrollbar-thumb': { backgroundColor: '#2A3550', borderRadius: 4 },
+  '&::-webkit-scrollbar-track': { backgroundColor: 'transparent' },
+};
 
 export function Dashboard() {
   const {
     country, initialStocks,
     levers, setLever, year, setYear,
-    history, runSim, running,
+    history, referenceHistory,
+    runSim, running,
     scenarios, saveScenario, loadScenario, deleteScenario,
     source, lastError,
   } = useSimStore();
 
   const [scenarioName, setScenarioName] = useState('');
   const current = history[Math.min(year - 2026, history.length - 1)];
+  const reference = referenceHistory?.[country] ?? [];
 
   // Fire the backend once on mount so the badge + chart reflect real data immediately
   useEffect(() => {
@@ -40,9 +50,23 @@ export function Dashboard() {
   }, [current, levers.subsidy]);
 
   return (
-    <Box sx={{ minHeight: '100vh' }}>
-      <AppBar position="sticky" elevation={0}
-        sx={{ bgcolor: 'background.paper', borderBottom: '1px solid #1E2740' }}>
+    <Box
+      sx={{
+        height: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+      }}
+    >
+      <AppBar
+        position="static"
+        elevation={0}
+        sx={{
+          flexShrink: 0,
+          bgcolor: 'background.paper',
+          borderBottom: '1px solid #1E2740',
+        }}
+      >
         <Toolbar>
           <Typography variant="h6">⚡ Energy Access Dynamics Simulator</Typography>
           <Box sx={{ flex: 1 }} />
@@ -56,14 +80,35 @@ export function Dashboard() {
               mr: 1,
             }}
           />
-          <Chip label={`${country} · 2026–2050`} size="small"
-            sx={{ bgcolor: '#1E2740', color: '#94A3B8' }} />
+          <Chip
+            label={`${country} · 2026–2075`}
+            size="small"
+            sx={{ bgcolor: '#1E2740', color: '#94A3B8' }}
+          />
         </Toolbar>
       </AppBar>
 
-      <Box sx={{ display: 'flex', p: 3, gap: 3, alignItems: 'flex-start' }}>
-        {/* ── Controls ── */}
-        <Paper sx={{ width: 320, p: 3, flexShrink: 0, border: '1px solid #1E2740' }}>
+      <Box
+        sx={{
+          display: 'flex',
+          flex: 1,
+          minHeight: 0,
+          overflow: 'hidden',
+          p: 3,
+          gap: 3,
+        }}
+      >
+        {/* ── LEFT: levers + scenarios, independently scrollable ── */}
+        <Paper
+          sx={{
+            width: 320,
+            flexShrink: 0,
+            p: 3,
+            overflowY: 'auto',
+            border: '1px solid #1E2740',
+            ...scrollbarSx,
+          }}
+        >
           <Typography variant="overline" color="text.secondary">
             Year 0 Baseline ({country})
           </Typography>
@@ -73,10 +118,12 @@ export function Dashboard() {
           }}>
             <Stack spacing={0.5}>
               <Typography variant="caption" sx={{ color: '#42A5F5' }}>
-                Grid: <b>{initialStocks?.grid ?? '—'}%</b> · SHS: <b>{initialStocks?.shs ?? '—'}%</b>
+                Grid: <b>{initialStocks?.grid ?? '—'}%</b> · SHS:{' '}
+                <b>{initialStocks?.shs ?? '—'}%</b>
               </Typography>
               <Typography variant="caption" sx={{ color: '#8D6E63' }}>
-                Traditional: <b>{initialStocks?.traditional ?? '—'}%</b> · Lantern: <b>{initialStocks?.lantern ?? '—'}%</b>
+                Traditional: <b>{initialStocks?.traditional ?? '—'}%</b> · Lantern:{' '}
+                <b>{initialStocks?.lantern ?? '—'}%</b>
               </Typography>
             </Stack>
           </Paper>
@@ -136,8 +183,18 @@ export function Dashboard() {
           </Stack>
         </Paper>
 
-        {/* ── Visuals ── */}
-        <Stack spacing={3} sx={{ flex: 1, minWidth: 0 }}>
+        {/* ── RIGHT: KPIs + charts + slider + map, independently scrollable ── */}
+        <Stack
+          spacing={3}
+          sx={{
+            flex: 1,
+            minWidth: 0,
+            overflowY: 'auto',
+            pr: 1,
+            pb: 1,
+            ...scrollbarSx,
+          }}
+        >
           <KpiCards
             year={year}
             access={current.shs + current.minigrid + current.grid}
@@ -145,26 +202,63 @@ export function Dashboard() {
             gridCoverage={current.grid}
           />
 
-          <Paper sx={{ p: 2, height: 420, border: '1px solid #1E2740' }}>
+          {/* Energy ladder (with value bar on top) */}
+          <Paper
+            sx={{
+              p: 2,
+              height: 470,
+              display: 'flex',
+              flexDirection: 'column',
+              flexShrink: 0,
+              border: '1px solid #1E2740',
+            }}
+          >
             <EnergyStackChart history={history} year={year} />
           </Paper>
 
-          <Paper sx={{ p: 2, border: '1px solid #1E2740' }}>
+          {/* Year slider */}
+          <Paper sx={{ p: 2, flexShrink: 0, border: '1px solid #1E2740' }}>
             <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
               <Typography variant="overline" color="text.secondary">Year</Typography>
               <input
-                type="range" min={2026} max={2050} value={year}
+                type="range" min={2026} max={2075} value={year}
                 onChange={(e) => setYear(+e.target.value)}
                 style={{ flex: 1, accentColor: '#FFB74D' }}
               />
-              <Typography variant="h6"
-                sx={{ fontWeight: 700, color: 'primary.main', minWidth: 60, textAlign: 'right' }}>
+              <Typography
+                variant="h6"
+                sx={{ fontWeight: 700, color: 'primary.main', minWidth: 60, textAlign: 'right' }}
+              >
                 {year}
               </Typography>
             </Stack>
           </Paper>
 
-          <Paper sx={{ height: 520, overflow: 'hidden', border: '1px solid #1E2740' }}>
+          {/* Δ vs. default policy — only renders once the reference run has landed */}
+          {reference.length > 0 && (
+            <Paper
+              sx={{
+                p: 2,
+                height: 400,
+                display: 'flex',
+                flexDirection: 'column',
+                flexShrink: 0,
+                border: '1px solid #1E2740',
+              }}
+            >
+              <DeltaChart current={history} reference={reference} />
+            </Paper>
+          )}
+
+          {/* Map */}
+          <Paper
+            sx={{
+              height: 520,
+              flexShrink: 0,
+              overflow: 'hidden',
+              border: '1px solid #1E2740',
+            }}
+          >
             {country === 'IND' ? (
               <IndiaMap states={INDIA_STATES} year={year} accessByState={accessByState} />
             ) : (
