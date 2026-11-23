@@ -1,0 +1,23 @@
+WORLD BANK DATA QUALITY REPORT
+========================================
+
+Status: VALID
+
+DATASET SUMMARY
+----------------------------------------
+total_rows: 1352
+countries: 4
+indicators: 13
+year_min: 2000
+year_max: 2025
+missing_values: 433
+country_codes: ['IND', 'KEN', 'NGA', 'RWA']
+indicator_names: ['clean_cooking_access', 'elec_access_rural', 'elec_access_total', 'elec_access_urban', 'elec_use_kwh_pc', 'gdp_per_capita_usd', 'income_share_q1', 'income_share_q2', 'income_share_q3', 'income_share_q4', 'income_share_q5', 'population', 'rural_pop_share']
+
+ERRORS (0)
+----------------------------------------
+None
+
+WARNINGS (1)
+----------------------------------------
+- 433 observations have missing indicator values.
