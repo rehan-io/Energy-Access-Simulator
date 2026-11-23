@@ -54,3 +54,32 @@ export async function fetchBaseline(
 
   return parseResponse<BaselineResponse>(response);
 }
+export interface DataRefreshStatus {
+  job_id: string | null;
+  status: 'idle' | 'running' | 'succeeded' | 'failed';
+  countries: string[];
+  mode: string | null;
+  started_at: number | null;
+  finished_at: number | null;
+  error: string | null;
+}
+
+export async function startDataRefresh(): Promise<{ job_id: string; status: string }> {
+  const response = await fetch('/api/data/refresh', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      countries: ['IND', 'KEN', 'RWA', 'NGA'],
+      mode: 'incremental',
+    }),
+  });
+
+return parseResponse<{ job_id: string; status: string }>(response);
+}
+
+export async function fetchDataRefreshStatus(): Promise<DataRefreshStatus> {
+  const response = await fetch('/api/data/refresh/status');
+  return parseResponse<DataRefreshStatus>(response);
+}

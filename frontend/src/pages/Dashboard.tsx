@@ -28,7 +28,11 @@ import { LeverSlider } from '../components/LeverSlider';
 import { KpiCards } from '../components/KpiCards';
 import { EnergyStackChart, TierStackChart } from '../components/EnergyStackChart';
 import { IndiaMap } from '../components/IndiaMap';
-
+import RefreshIcon from '@mui/icons-material/Refresh';
+import {
+  startDataRefresh,
+  fetchDataRefreshStatus,
+} from '../services/api';
 export function Dashboard() {
   const {
     country,
@@ -57,12 +61,59 @@ export function Dashboard() {
   } = useSimStore();
 
   const [scenarioName, setScenarioName] = useState('');
-
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshMessage, setRefreshMessage] = useState('');
+  const [refreshError, setRefreshError] = useState(false);
   useEffect(() => {
     void initCountries();
     void runSim();
   }, [initCountries, runSim]);
+  const handleDataRefresh = async () => {
+  setRefreshing(true);
+  setRefreshMessage('Starting World Bank data refresh...');
+  setRefreshError(false);
 
+  try {
+    await startDataRefresh();
+
+    let result = await fetchDataRefreshStatus();
+let attempts = 0;
+
+while (result.status === 'running' && attempts < 150) {
+  await new Promise((resolve) => setTimeout(resolve, 2000));
+  result = await fetchDataRefreshStatus();
+  attempts++;
+}
+
+if (result.status === 'running') {
+  throw new Error(
+    'Refresh is taking longer than expected. Check the refresh status again.',
+  );
+}
+
+    if (result.status === 'failed') {
+      throw new Error(result.error || 'World Bank data refresh failed.');
+    }
+
+    if (result.status !== 'succeeded') {
+      throw new Error('Unexpected refresh status. Please try again.');
+    }
+
+    setRefreshMessage('Data refreshed successfully. Updating dashboard...');
+
+    await initCountries();
+    await runSim();
+
+    setRefreshMessage('World Bank data refreshed successfully.');
+  } catch (err) {
+    setRefreshError(true);
+    setRefreshMessage(
+      err instanceof Error ? err.message : 'Unable to refresh World Bank data.',
+    );
+  } finally {
+    setRefreshing(false);
+  }
+};
   const current = history.find((row) => row.year === selectedYear);
   const firstYear = history[0]?.year;
   const lastYear = history.at(-1)?.year;
@@ -108,8 +159,33 @@ export function Dashboard() {
               </Select>
             </FormControl>
           </Stack>
+          <Button
+  variant="outlined"
+  color="primary"
+  startIcon={<RefreshIcon />}
+  onClick={handleDataRefresh}
+  disabled={refreshing}
+  sx={{ whiteSpace: 'nowrap' }}
+>
+  {refreshing ? 'Refreshing...' : 'Refresh Data'}
+</Button>
         </Toolbar>
       </AppBar>
+      {refreshMessage && (
+  <Alert
+    severity={
+      refreshError
+        ? 'error'
+        : refreshing
+          ? 'info'
+          : 'success'
+    }
+    onClose={() => setRefreshMessage('')}
+    sx={{ mx: 3, mt: 2 }}
+  >
+    {refreshMessage}
+  </Alert>
+)}
 
       <Box
         sx={{
