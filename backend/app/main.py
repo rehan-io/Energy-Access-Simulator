@@ -2,9 +2,16 @@ from datetime import date
 import re
 import time
 
-from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+import threading
+import uuid
+from typing import Literal
+
+from fastapi import FastAPI, HTTPException, BackgroundTasks
 from pydantic import BaseModel, Field
+
+from app.data.refresh_worldbank import refresh_worldbank_data
+from app.data.dataset_loader import get_data_directory
 
 from app.data.fetch_worldbank import (
     DEFAULT_INDICATORS,
@@ -158,7 +165,124 @@ def validate_country(country_code: str) -> str:
 
     return country_code
 
+class DataRefreshRequest(BaseModel):
+    countries: list[str] = Field(
+        default_factory=lambda: ["IND", "KEN", "RWA", "NGA"],
+        min_length=1,
+        max_length=4,
+    )
+    mode: Literal["incremental", "full"] = "incremental"
+    start: int = Field(default=2000, ge=1960)
+    end: int = Field(default_factory=lambda: date.today().year, ge=1960)
+    overlapYears: int = Field(default=3, ge=0, le=10)
 
+
+_refresh_lock = threading.Lock()
+
+_refresh_state = {
+    "job_id": None,
+    "status": "idle",
+    "countries": [],
+    "mode": None,
+    "started_at": None,
+    "finished_at": None,
+    "error": None,
+}
+
+
+def _run_data_refresh(
+    countries: list[str],
+    mode: str,
+    start: int,
+    end: int,
+    overlap_years: int,
+):
+    with _refresh_lock:
+        _refresh_state["status"] = "running"
+
+    try:
+        refresh_worldbank_data(
+            countries=countries,
+            start=start,
+            end=end,
+            active_dir=get_data_directory(),
+            mode=mode,
+            overlap_years=overlap_years,
+        )
+
+        with _refresh_lock:
+            _refresh_state["status"] = "succeeded"
+
+    except Exception as exc:
+        with _refresh_lock:
+            _refresh_state["status"] = "failed"
+            _refresh_state["error"] = str(exc)
+
+    finally:
+        with _refresh_lock:
+            _refresh_state["finished_at"] = time.time()
+
+
+@app.post("/api/data/refresh", status_code=202)
+def start_data_refresh(
+    request: DataRefreshRequest,
+    background_tasks: BackgroundTasks,
+):
+    countries = list(dict.fromkeys(
+        validate_country(country) for country in request.countries
+    ))
+
+    if request.start > request.end:
+        raise HTTPException(
+            status_code=422,
+            detail="Start year must not exceed end year.",
+        )
+
+    if request.end > date.today().year:
+        raise HTTPException(
+            status_code=422,
+            detail="End year cannot exceed the current year.",
+        )
+
+    with _refresh_lock:
+        if _refresh_state["status"] == "running":
+            raise HTTPException(
+                status_code=409,
+                detail="A World Bank refresh is already running.",
+            )
+
+        job_id = str(uuid.uuid4())
+
+        _refresh_state.update({
+            "job_id": job_id,
+            "status": "running",
+            "countries": countries,
+            "mode": request.mode,
+            "started_at": time.time(),
+            "finished_at": None,
+            "error": None,
+        })
+
+    background_tasks.add_task(
+        _run_data_refresh,
+        countries,
+        request.mode,
+        request.start,
+        request.end,
+        request.overlapYears,
+    )
+
+    return {
+        "job_id": job_id,
+        "status": "running",
+        "message": "World Bank data refresh started.",
+    }
+
+
+@app.get("/api/data/refresh/status")
+def get_data_refresh_status():
+    with _refresh_lock:
+        return dict(_refresh_state)
 @app.get("/api/countries")
 def get_countries():
     """Return supported countries and their observed baseline access."""
