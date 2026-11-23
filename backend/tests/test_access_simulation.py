@@ -151,7 +151,7 @@ class TestAccessSimulation(unittest.TestCase):
         with self.assertRaises(ValueError):
             run_access_simulation(data)
 
-        def test_empty_future_historical_year_is_excluded(self):
+    def test_empty_future_historical_year_is_excluded(self):
          historical_data = make_history()
 
          for indicator in ACCESS_INDICATORS:
@@ -172,5 +172,51 @@ class TestAccessSimulation(unittest.TestCase):
 
          self.assertEqual(len(rows_2025), 1)
          self.assertEqual(rows_2025[0]["kind"], "projected")
+    
+    def test_valid_observation_survives_null_duplicate(self):
+        data = make_history()
+
+        data["elec_access_total"].extend([
+            {"year": 2024, "value": None},
+            {"year": 2024, "value": 58.0},
+        ])
+
+        result = run_access_simulation(data, years=1)
+
+        row = next(
+            row for row in result["history"]
+            if row["year"] == 2024
+        )
+
+        self.assertEqual(row["elec_access_total"], 58.0)
+
+    def test_identical_valid_duplicates_are_accepted(self):
+        data = make_history()
+
+        data["elec_access_total"].append({
+            "year": 2024,
+            "value": 58.0,
+        })
+
+        result = run_access_simulation(data, years=1)
+
+        row = next(
+            row for row in result["history"]
+            if row["year"] == 2024
+        )
+
+        self.assertEqual(row["elec_access_total"], 58.0)
+
+    def test_conflicting_valid_duplicates_are_rejected(self):
+        data = make_history()
+
+        data["elec_access_total"].append({
+            "year": 2024,
+            "value": 59.0,
+        })
+
+        with self.assertRaises(ValueError):
+            run_access_simulation(data, years=1)
+
 if __name__ == "__main__":
     unittest.main()

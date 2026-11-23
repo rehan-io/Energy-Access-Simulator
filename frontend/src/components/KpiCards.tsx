@@ -1,33 +1,60 @@
-import { Card, CardContent, Stack, Typography } from '@mui/material';
+import { Box, Card, CardContent, Typography } from '@mui/material';
+import type { YearSnapshot } from '../types';
 
 interface Props {
   year: number;
-  access: number;
-  traditional: number;
-  gridCoverage: number;
+  current: YearSnapshot | undefined;
 }
 
-export function KpiCards({ year, access, traditional, gridCoverage }: Props) {
+export function KpiCards({ year, current }: Props) {
+  const format = (value: number | null | undefined) =>
+    value == null ? 'Not available' : `${value.toFixed(1)}%`;
+
   const items = [
-    { label: 'Total Access',      value: `${access.toFixed(1)}%`,       color: '#42A5F5', sub: `projected ${year}` },
-    { label: 'Grid Coverage',     value: `${gridCoverage.toFixed(1)}%`, color: '#4DD0E1', sub: 'utility-scale' },
-    { label: 'On Traditional',    value: `${traditional.toFixed(1)}%`,  color: '#8D6E63', sub: 'kerosene / biomass' },
+    { label: 'Electricity access', value: format(current?.elec_access_total), color: '#42A5F5', description: 'National population' },
+    { label: 'Rural electricity access', value: format(current?.elec_access_rural), color: '#4DD0E1', description: 'Rural population' },
+    { label: 'Urban electricity access', value: format(current?.elec_access_urban), color: '#FFB74D', description: 'Urban population' },
+    { label: 'Clean cooking access', value: format(current?.clean_cooking_access), color: '#66BB6A', description: 'Separate access indicator' },
   ];
+
   return (
-    <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
-      {items.map((it) => (
-        <Card key={it.label} sx={{ flex: 1, border: '1px solid #1E2740' }}>
+    <Box
+      sx={{
+        display: 'grid',
+        gridTemplateColumns: {
+          xs: '1fr',
+          sm: 'repeat(2, minmax(0, 1fr))',
+          xl: 'repeat(4, minmax(0, 1fr))',
+        },
+        gap: 2,
+      }}
+    >
+      {items.map((item) => (
+        <Card key={item.label} sx={{ minWidth: 0, border: '1px solid #1E2740' }}>
           <CardContent>
-            <Typography variant="caption" sx={{ color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 1 }}>
-              {it.label}
+            <Typography
+              variant="caption"
+              sx={{ color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 1 }}
+            >
+              {item.label}
             </Typography>
-            <Typography variant="h4" sx={{ color: it.color, mt: 0.5, fontVariantNumeric: 'tabular-nums' }}>
-              {it.value}
+            <Typography
+              variant="h4"
+              sx={{
+                color: item.color,
+                mt: 0.5,
+                fontVariantNumeric: 'tabular-nums',
+                fontSize: { xs: '1.8rem', md: '2rem' },
+              }}
+            >
+              {item.value}
             </Typography>
-            <Typography variant="caption" sx={{ color: 'text.secondary' }}>{it.sub}</Typography>
+            <Typography variant="caption" color="text.secondary">
+              {item.description} · {year}
+            </Typography>
           </CardContent>
         </Card>
       ))}
-    </Stack>
+    </Box>
   );
 }

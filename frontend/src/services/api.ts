@@ -1,27 +1,56 @@
-// frontend/src/services/api.ts
-import type { Levers, YearSnapshot, CountryOption, TierKey } from '../types';
+
+import type {
+  BaselineResponse,
+  CountryOption,
+  SimulationRequest,
+  SimulationResponse,
+} from '../types';
+
+async function parseResponse<T>(response: Response): Promise<T> {
+  if (!response.ok) {
+    let detail = response.statusText;
+
+    try {
+      const body = await response.json();
+      detail =
+        typeof body.detail === 'string'
+          ? body.detail
+          : JSON.stringify(body.detail ?? body);
+    } catch {
+      // Retain the HTTP status text if the response isn't JSON.
+    }
+
+    throw new Error(`API error (${response.status}): ${detail}`);
+  }
+
+  return response.json() as Promise<T>;
+}
 
 export async function fetchCountries(): Promise<CountryOption[]> {
-  const res = await fetch('/api/countries');
-  if (!res.ok) throw new Error('Failed to load countries');
-  return res.json();
+  const response = await fetch('/api/countries');
+  return parseResponse<CountryOption[]>(response);
 }
 
 export async function fetchSimulation(
-  levers: Levers,
-  country = 'IND',
-  startYear = 2026,
-  years = 25,
-): Promise<{ history: YearSnapshot[]; initialStocks: Record<TierKey, number> }> {
-  const res = await fetch('/api/simulate', {
+  request: SimulationRequest,
+): Promise<SimulationResponse> {
+  const response = await fetch('/api/simulate', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ levers, country, startYear, years }),
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(request),
   });
 
-  if (!res.ok) {
-    throw new Error(`Simulation failed: ${res.statusText}`);
-  }
+  return parseResponse<SimulationResponse>(response);
+}
 
-  return res.json();
+export async function fetchBaseline(
+  countryCode: string,
+): Promise<BaselineResponse> {
+  const response = await fetch(
+    `/api/baseline/${encodeURIComponent(countryCode)}`,
+  );
+
+  return parseResponse<BaselineResponse>(response);
 }
