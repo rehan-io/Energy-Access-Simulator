@@ -1,172 +1,291 @@
 # Energy Access Dynamics Simulator
 
-**Policy Planning for Universal Electrification**
+**CS699 Project | Policy exploration for electricity access and clean cooking**
 
----
+The Energy Access Dynamics Simulator is an interactive dashboard and Python simulation backend for exploring how policy settings may affect electricity access, clean cooking access, and the distribution of households across a five-tier energy ladder.
 
-## 📌 Project Status
-> **🚀 Phase: Active Development (MVP Implemented)**  
-> Core backend services (World Bank data pipeline, country calibration, coupled five-tier simulation engine, FastAPI endpoints, and test suite) and the interactive React dashboard are implemented and functional.
+This README describes the functionality currently present in the repository. It does not describe planned integrations or features that are not implemented.
 
----
+## Current implementation
 
-## 📖 Overview
+- Interactive React dashboard with country selection, projection horizon, historical trend window, policy controls, KPI summaries, and time-series visualizations.
+- Country-level historical data and model inputs loaded from processed World Bank datasets bundled in the repository.
+- Two simulation paths exposed by the API:
+  - Historical access trend estimation using recent valid observations and least-squares linear trends.
+  - A coupled Bass-Logistic and five-tier stock-and-flow model, driven by country baseline data, macroeconomic context, and policy levers.
+- Four supported countries: India (IND), Kenya (KEN), Rwanda (RWA), and Nigeria (NGA).
+- Manual World Bank dataset refresh from the dashboard, with background execution and status reporting.
+- Command-line full and incremental World Bank refresh workflows, including cleaning, validation, staged output, and promotion of validated datasets.
+- Backend unit/API tests for the data pipeline and coupled simulation.
 
-**Energy Access Dynamics Simulator** is a data-driven policy sandbox designed to help researchers, policymakers, and NGOs navigate the complex transition from traditional fuels to modern electricity in developing regions. 
+## What the model currently represents
 
-Nearly 1 billion people lack reliable electricity, and the poorest 80% of households are consistently the last to be reached. Governments face a critical dilemma: Should they extend the national grid, subsidize off-grid Solar Home Systems (SHS), or invest in community mini-grids? 
+The coupled simulation tracks five household energy tiers:
 
-This project answers these "what-if" questions by combining **real-world public data**, **system dynamics modeling**, and an **interactive, beautiful geospatial dashboard** to simulate the long-term cascading effects of energy policies.
+1. Traditional fuels
+2. Solar lanterns
+3. Solar home systems (SHS)
+4. Mini-grids
+5. National grid
 
----
+It also models national, rural, and urban electricity access, plus clean cooking access.
 
-## 🎯 Motivation & Problem Statement
+The dashboard exposes these policy controls:
 
-- **The Reality:** Rural households climb an "energy ladder"—starting with kerosene/diesel, moving to solar lanterns, then Solar Home Systems, then mini-grids, and finally the national grid. 
-- **The Challenge:** Each step involves trade-offs between cost, reliability, and infrastructure availability. The poorest households are often left behind because grid extension is expensive and upfront costs for solar are too high.
-- **The Gap:** There is a lack of open-source, transparent tools that allow stakeholders to simulate how subsidies, carbon taxes, and infrastructure speeds affect the bottom 80% over a 20–30 year horizon.
-- **Our Solution:** A dynamic simulation engine paired with a modern, interactive dashboard that visualizes both temporal trends and spatial infrastructure layouts.
+- **Subsidy percentage**
+- **Carbon tax**
+- **Off-grid deployment rate**
+- **Grid extension speed**
+- **Recycle carbon-tax revenue** (on/off)
 
----
+The API accepts a projection horizon of 1–100 years and a historical trend window of 2–30 years.
 
-## 📊 Public Data Sources
+### Important interpretation notes
 
-The simulator automatically ingests and calibrates itself using:
+- Electricity access and clean cooking access are separate indicators.
+- The five-tier model uses country-specific **illustrative initial tier splits**. These are model assumptions, not a directly observed breakdown of household connections by technology.
+- Historical observations and model projections are distinguished in the returned simulation history and in the dashboard charts.
+- Missing source observations are not automatically interpreted as zero.
+- The map currently renders an Esri basemap centred on India. It is geographic context only; it is not a choropleth or a map of simulated infrastructure deployment.
+- Saved scenarios are held in the running frontend application's Zustand state. They are not persisted to a database or browser storage, so they are lost when the application state is reset or the page is reloaded.
+- The dashboard's refresh action updates the shared processed dataset files used by the backend. It is a manual action, not an automatic refresh on every dashboard load.
 
-- **World Bank / ESMAP** – Country-wise electrification rates and access indicators.
-- **IEA Energy Access Database** – Historical energy transition trends and adoption curves.
-- **OpenStreetMap (OSM)** – Existing grid lines, off-grid infrastructure, and mini-grid locations.
-- **National Energy Ministry Portals** – Country-specific pricing, tariff structures, and subsidy data.
+## Data
 
----
+The repository includes processed World Bank data for the supported countries under:
 
-## ⚙️ Core System Dynamics (The Simulation Engine)
-
-The mathematical heart of the project is a **Stock & Flow** model updated annually.
-
-### 1. The "Stocks" (Household Categories)
-- **Stock A:** Traditional Fuels (Kerosene, Diesel, Biomass)
-- **Stock B:** Solar Lanterns (Basic lighting & phone charging)
-- **Stock C:** Solar Home Systems (SHS – Panels + Battery for appliances)
-- **Stock D:** Mini-Grids (Community-level local power networks)
-- **Stock E:** National Grid (Full, unlimited utility-scale electricity)
-
-### 2. The "Flows" (Adoption Rates)
-Households move from lower stocks to higher stocks based on 4 key drivers:
-- **Price** (Upfront & operational costs)
-- **Subsidies** (Government financial support)
-- **Reliability** (Uptime and maintenance)
-- **Awareness** (Social diffusion & marketing)
-
-### 3. The Feedback Loops
-The simulation incorporates a positive feedback loop (learning curve):  
-*More adoption → Increased manufacturing scale → Lower unit costs → Even faster adoption.*  
-This ensures the model captures realistic market acceleration.
-
-### 4. User Controls (The Policy Levers)
-Users can adjust 4 primary dials via the dashboard:
-- **Subsidy Percentage** – Reduces upfront capital costs.
-- **Carbon Tax** – Raises the price of traditional fuels to incentivize switching.
-- **Off-Grid Deployment Rate** – Speed at which solar companies reach rural areas.
-- **Grid Extension Speed** – Annual rate at which the national power company builds new lines.
-
----
-
-## ✨ Project USP (Unique Selling Points) - Baseline Features
-
-### ✅ 1. Multi-Tier "Energy Ladder" Modeling
-Instead of a binary "electrified/not electrified" flag, the model tracks the gradual, realistic transition across 5 distinct energy tiers alongside rural, urban, and clean cooking access.
-
-### ✅ 2. Endogenous Feedback Loops
-The simulation dynamically reduces off-grid technology costs based on cumulative adoption (Wright's Law), mimicking real-world manufacturing learning curves.
-
-### ✅ 3. Real-Time Interactive Policy Levers
-Users can move sliders for subsidies, carbon taxes, off-grid deployment, and grid extension speeds on the dashboard and instantly see the projected results update.
-
-### ✅ 4. Automated Data Calibration
-Python ingestion, cleaning, and validation scripts automatically pull World Bank data to calibrate the model's baseline to match a selected country's current reality.
-
-### ✅ 5. Interactive Geospatial Map Visualization
-Instead of just spreadsheets, the dashboard features an interactive Leaflet map visualizing country-level electrification and clean cooking access across supported regions.
-
-### ✅ 6. Comparative Scenario Dashboard
-Users can run multiple policy scenarios side-by-side (e.g., "High Subsidy" vs. "Fast Grid") and toggle between them to compare multi-decade access trajectories.
-
----
-
-## 🧰 Tech Stack
-
-| Layer | Technology |
-| :--- | :--- |
-| **Frontend (Dashboard)** | **React** (TypeScript) + **Vite** for fast builds; **Material-UI (MUI)** for responsive UI components; **Apache ECharts** for interactive charts; **Leaflet** (`react-leaflet`) for geospatial map rendering; **Zustand** & **Axios** for state management and API requests. |
-| **Backend (API)** | **FastAPI** + **Uvicorn** (Python) to serve RESTful endpoints, handle simulation requests, and return JSON results with automatic Swagger documentation. |
-| **Simulation Engine** | **Python 3.10+** with **Pandas** and standard-library **`math`** for coupled Bass-Logistic & five-tier stock-and-flow difference equations and OLS trend calibration. |
-| **Data Pipeline** | **Python** CLI modules (`fetch_worldbank.py`, `clean_worldbank.py`, `validate_worldbank.py`, `refresh_worldbank.py`) using **Pandas** and **Requests** to ingest, validate, and refresh World Bank datasets. |
-| **Testing & Linting** | **Git** for version control; **pytest** / `unittest` for backend test suites; **Oxlint** for React/TypeScript linting. |
-
----
-
-## 📁 Repository Structure
 ```text
-energy-access-simulator/
-├── backend/
-│   ├── app/
-│   │   ├── core/                # Simulation engines (access_simulation.py, simulation.py)
-│   │   ├── data/                # World Bank ingestion, cleaning, validation & loaders
-│   │   ├── model/               # Country calibration, schemas & simulation input builders
-│   │   └── main.py              # FastAPI endpoints (/api/health, /api/countries, /api/simulate, etc.)
-│   ├── data/
-│   │   └── processed/worldbank/ # Cleaned World Bank CSVs & data quality report
-│   ├── tests/                   # Unit & API test suites (pytest / unittest)
-│   └── requirements.txt
-├── frontend/
-│   ├── public/                  # Static assets (favicon.svg)
-│   ├── src/                     # React + TypeScript dashboard source
-│   ├── index.html
-│   ├── package.json
-│   └── package-lock.json
-├── .gitignore
-└── README.md                    # You are here!
+backend/data/processed/worldbank/
+├── worldbank_long.csv
+├── worldbank_wide.csv
+├── worldbank_latest.csv
+└── worldbank_quality_report.txt
 ```
 
+The loader uses this directory by default. It can be overridden with the `WORLD_BANK_DATA_DIR` environment variable.
 
-## 🔄 How It Works (User Journey)
+The long dataset stores country-year-indicator observations. The wide dataset pivots indicators into columns for model input and calibration. The latest dataset stores the latest available observation independently for each country and indicator.
 
-1. **Ingest:** The system runs `fetch_energy_data.sh` to pull the latest World Bank, IEA, and OSM data.
-2. **Calibrate:** `calibrate_model.sh` uses a Python script to fit the initial stocks to the real-world baseline of the selected country.
-3. **Configure:** The user opens the React dashboard and adjusts the 4 policy levers using intuitive sliders.
-4. **Simulate:** The frontend sends a POST request to the FastAPI backend. The backend runs the system dynamics difference equations for the next 25 years.
-5. **Visualize:** The backend returns time-series data and GeoJSON map layers. The frontend:
-   - Animates the stacked area charts to show households moving up the ladder.
-   - Updates the Mapbox heatmaps to show geographical electrification spread.
-6. **Compare:** The user can create a new Git branch to save this scenario and run an alternative policy, comparing both side-by-side on the dashboard.
+The refresh pipeline retrieves data from the World Bank API. It does not currently ingest IEA, OpenStreetMap, or national ministry datasets.
 
----
+## Architecture
 
-## 🚀 Future Scope & Stretch Goals
+### Frontend
 
-- **Agent-Based Modeling (ABM):** Introduce heterogeneous household characteristics (wealth, location, family size) to refine adoption predictions.
-- **Real-time Weather Integration:** Hook in solar irradiance data to model the reliability of Solar Home Systems under different climate conditions.
-- **Cost-Benefit Analysis Module:** Automatically compute the Net Present Value (NPV) and Internal Rate of Return (IRR) for each policy mix.
-- **Mobile Responsiveness:** Optimize the dashboard for tablet usage during field surveys.
+- React 19
+- TypeScript
+- Vite
+- Material UI (MUI)
+- Apache ECharts via `echarts-for-react`
+- Leaflet via `react-leaflet`
+- Zustand for in-memory application state
+- Browser Fetch API for backend requests
 
----
+### Backend
 
-<!-- ## 🤝 Contributing
+- Python
+- FastAPI and Uvicorn
+- Pydantic request/response models
+- Pandas for dataset processing
+- Requests and urllib3 for World Bank API access
 
-*Currently, this project is in the planning phase. Contribution guidelines will be published once the initial codebase is scaffolded. Please check back later for development milestones.*
+The Vite development server proxies `/api` requests to the local FastAPI server at `http://127.0.0.1:8000`.
 
---- -->
+## Repository layout
 
-## 📄 License
+```text
+Energy-Access-Simulator/
+├── backend/
+│   ├── app/
+│   │   ├── core/
+│   │   │   ├── access_simulation.py
+│   │   │   └── simulation.py
+│   │   ├── data/
+│   │   │   ├── fetch_worldbank.py
+│   │   │   ├── clean_worldbank.py
+│   │   │   ├── validate_worldbank.py
+│   │   │   ├── refresh_worldbank.py
+│   │   │   ├── dataset_loader.py
+│   │   │   └── schemas.py
+│   │   ├── model/
+│   │   │   ├── simulation_inputs.py
+│   │   │   ├── calibration.py
+│   │   │   └── calibration_schema.py
+│   │   └── main.py
+│   ├── data/
+│   │   └── processed/worldbank/
+│   ├── tests/
+│   └── requirements.txt
+├── frontend/
+│   ├── src/
+│   │   ├── components/
+│   │   ├── pages/
+│   │   ├── services/
+│   │   ├── store/
+│   │   └── types/
+│   ├── package.json
+│   └── vite.config.ts
+└── README.md
+```
 
-[MIT](https://choosealicense.com/licenses/mit/)
+## Requirements
 
----
+Install the following before running the application:
 
-## 📧 Contact
+- Python 3.10 or newer
+- Node.js and npm (use a Node.js version compatible with the Vite version in `frontend/package.json`)
+- Git
 
-For inquiries regarding this project blueprint, please reach out to the project maintainers.
+The frontend and backend run as separate development processes.
 
----
-`````[cite: 1]
+## Run locally
+
+The commands below are written for **Windows PowerShell**. Run the backend and frontend in two separate terminals.
+
+### 1. Clone the repository
+
+```powershell
+git clone https://github.com/rehan-io/Energy-Access-Simulator.git
+cd Energy-Access-Simulator
+```
+
+If you are working from an existing clone, first switch to the branch containing the implementation you want to run.
+
+### 2. Set up and start the backend
+
+```powershell
+cd backend
+
+py -3 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+
+python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+If PowerShell blocks virtual-environment activation, allow it for the current terminal session and activate again:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\.venv\Scripts\Activate.ps1
+```
+
+The API is available at:
+
+- Health check: `http://127.0.0.1:8000/api/health`
+- Interactive API documentation: `http://127.0.0.1:8000/docs`
+
+Keep this terminal running.
+
+### 3. Set up and start the frontend
+
+Open a **second PowerShell terminal** at the repository root:
+
+```powershell
+cd frontend
+npm ci
+npm run dev
+```
+
+Open the local URL printed by Vite (normally `http://localhost:5173`).
+
+The frontend's Vite configuration proxies API requests to the backend on port 8000. Start the backend before using the dashboard.
+
+### macOS / Linux equivalents
+
+From the repository root, the backend setup is:
+
+```bash
+cd backend
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+In a second terminal:
+
+```bash
+cd frontend
+npm ci
+npm run dev
+```
+
+## Refresh World Bank data
+
+The processed datasets are already included in the repository, so a first run does not require a data refresh.
+
+### From the dashboard
+
+Use **Refresh Data** in the dashboard header. The frontend starts a background refresh for IND, KEN, RWA, and NGA in incremental mode, polls the refresh status endpoint, and reloads the country data and simulation after a successful refresh.
+
+### From the command line
+
+Run these commands from the `backend` directory with the backend virtual environment activated.
+
+Full refresh (fetches the requested year range):
+
+```powershell
+python -m app.data.refresh_worldbank --countries IND KEN RWA NGA --mode full --start 2000 --end 2026
+```
+
+Incremental refresh (uses a three-year overlap by default):
+
+```powershell
+python -m app.data.refresh_worldbank --countries IND KEN RWA NGA --mode incremental --overlap-years 3
+```
+
+Replace `2026` with the current year when running the full-refresh command in a later year. The API and CLI validate that the end year is not in the future.
+
+The refresh process fetches the source data, merges it with the existing long dataset, regenerates the long/wide/latest outputs, validates the merged data, writes a quality report, and promotes the staged files only after validation succeeds. If promotion fails, the previous files are restored.
+
+## API endpoints
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/api/health` | Backend health check |
+| GET | `/api/countries` | Supported countries and latest baseline access values |
+| GET | `/api/baseline/{country_code}` | Historical observations and estimated trends |
+| POST | `/api/simulate` | Run an access-trend or coupled policy simulation |
+| POST | `/api/worldbank` | Fetch selected World Bank indicators for a request |
+| POST | `/api/data/refresh` | Start a background processed-data refresh |
+| GET | `/api/data/refresh/status` | Read the current refresh job status |
+
+The coupled simulation request supplies `policyLevers`. If `policyLevers` is omitted, the API uses the access-trend simulation path and accepts `policyAdjustments` for the supported access indicators. See `backend/app/main.py` and the interactive API documentation at `/docs` for request schemas.
+
+## Run tests
+
+Run backend tests from the `backend` directory with the backend virtual environment activated:
+
+```powershell
+python -m unittest discover -s tests -v
+```
+
+The tests cover World Bank data normalization, duplicate handling, wide/latest dataset generation, validation, coupled simulation behavior, bounds and tier conservation, and API behavior.
+
+Check the frontend TypeScript build from the `frontend` directory:
+
+```powershell
+npm run build
+```
+
+Run the configured frontend linter with:
+
+```powershell
+npm run lint
+```
+
+## Current limitations
+
+- The application is a local development setup; production hosting and deployment configuration are not documented or configured here.
+- There is no database-backed scenario persistence or cross-user scenario sharing.
+- The map is a basemap only and is not connected to the model's outputs.
+- The five-tier initial splits are illustrative assumptions; the model should not be interpreted as having observed technology-level household connection data for each country.
+- The model is a policy exploration tool. Its projections depend on model structure, calibration inputs, and assumptions; they should not be treated as official forecasts.
+
+## License
+
+The repository currently identifies the project license as MIT. See the repository's license file for the applicable terms.
