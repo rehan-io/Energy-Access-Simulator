@@ -13,7 +13,7 @@ DATA_DIR = Path(__file__).resolve().parents[1] / "data" / "processed" / "worldba
 class TestCountryCalibration(unittest.TestCase):
 
     def test_all_supported_countries_calibrate(self):
-        for country in ("IND", "KEN", "RWA", "NGA"):
+        for country in ("IND", "KEN", "RWA", "NGA", "SYR"):
             with self.subTest(country=country):
                 baseline = get_calibrated_baseline(country, DATA_DIR)
 

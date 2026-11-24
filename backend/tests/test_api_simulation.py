@@ -23,6 +23,7 @@ def fake_simulation(country_code, years=25, trend_window=10,
         "KEN": 70.0,
         "RWA": 60.0,
         "NGA": 50.0,
+        "SYR": 55.0
     }[country_code]
 
     historical = {
@@ -200,7 +201,7 @@ def test_countries_endpoint(mocked_simulation):
 
     assert len(countries) == 4
     assert {country["code"] for country in countries} == {
-        "IND", "KEN", "RWA", "NGA"
+        "IND", "KEN", "RWA", "NGA", "SYR"
     }
 
     assert all("access" in country for country in countries)

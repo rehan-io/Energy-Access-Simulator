@@ -141,7 +141,7 @@ class TestCoupledSimulationFormula(unittest.TestCase):
         self.assertGreater(c_shielded, c_recycled)
 
     def test_bounds_and_five_tier_stock_conservation(self):
-        for iso3 in ("IND", "KEN", "RWA", "NGA"):
+        for iso3 in ("IND", "KEN", "RWA", "NGA", "SYR"):
             result = run_country_coupled_simulation(
                 country_code=iso3,
                 years=30,

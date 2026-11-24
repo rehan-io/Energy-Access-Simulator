@@ -33,6 +33,7 @@ COUNTRY_NAMES = {
     "KEN": "Kenya",
     "RWA": "Rwanda",
     "NGA": "Nigeria",
+    "SYR": "Syria",
 }
 
 DEFAULT_MACRO_FALLBACKS = {
@@ -68,6 +69,14 @@ DEFAULT_MACRO_FALLBACKS = {
         "bottom_80_income_share": 58.5,
         "elec_use_kwh_pc": 140.6,
     },
+    "SYR": {
+            "rural_pop_share": 0.3702,
+            "rural_pop_drift": -0.0080,
+            "gdp_per_capita_usd": 1084.2,
+            "gdp_growth_rate": 0.025,
+            "bottom_80_income_share": 58.5,
+            "elec_use_kwh_pc": 140.6,
+        },
 }
 
 

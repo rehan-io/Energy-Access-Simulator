@@ -149,6 +149,7 @@ AVAILABLE_COUNTRIES = [
     {"code": "KEN", "name": "Kenya"},
     {"code": "RWA", "name": "Rwanda"},
     {"code": "NGA", "name": "Nigeria"},
+    {"code": "SYR", "name": "SYria"},
 ]
 
 
@@ -167,9 +168,9 @@ def validate_country(country_code: str) -> str:
 
 class DataRefreshRequest(BaseModel):
     countries: list[str] = Field(
-        default_factory=lambda: ["IND", "KEN", "RWA", "NGA"],
+        default_factory=lambda: ["IND", "KEN", "RWA", "NGA", "SYR"],
         min_length=1,
-        max_length=4,
+        max_length=5,
     )
     mode: Literal["incremental", "full"] = "incremental"
     start: int = Field(default=2000, ge=1960)

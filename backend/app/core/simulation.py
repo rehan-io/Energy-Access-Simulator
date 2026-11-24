@@ -70,6 +70,14 @@ COUNTRY_CALIBRATION_PARAMS: dict[str, CountryCalibrationParams] = {
         grid_reliability=0.45,
         tier_split=(0.54, 0.02, 0.045, 0.02),
     ),
+    "SYR": CountryCalibrationParams(
+            k_grid_r0=0.012,
+            k_off_r0=0.015,
+            k_u0=0.030,
+            k_cook0=0.080,
+            grid_reliability=0.45,
+            tier_split=(0.54, 0.02, 0.045, 0.02),
+        ),
 }
 
 DEFAULT_CALIBRATION_PARAMS = CountryCalibrationParams(

@@ -71,7 +71,7 @@ export async function startDataRefresh(): Promise<{ job_id: string; status: stri
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      countries: ['IND', 'KEN', 'RWA', 'NGA'],
+      countries: ['IND', 'KEN', 'RWA', 'NGA', 'SYR'],
       mode: 'incremental',
     }),
   });
